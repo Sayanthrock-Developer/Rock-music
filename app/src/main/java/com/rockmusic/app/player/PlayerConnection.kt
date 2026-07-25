@@ -34,6 +34,7 @@ class PlayerConnection @Inject constructor(
     private val favouriteStore = FavouriteStore(context)
     private var controller: MediaController? = null
     private var pendingQueue: PendingQueue? = null
+    private var pendingVolume: Float? = null
 
     private val _state = MutableStateFlow(PlayerUiState())
     val state: StateFlow<PlayerUiState> = _state.asStateFlow()
@@ -71,12 +72,18 @@ class PlayerConnection @Inject constructor(
                     .onSuccess { mediaController ->
                         controller = mediaController
                         mediaController.addListener(listener)
-                        publish(mediaController, includeQueue = true)
-                        startPositionUpdates()
-                        pendingQueue?.let { queue ->
+                        pendingVolume?.let { requestedVolume ->
+                            mediaController.volume = requestedVolume
+                            pendingVolume = null
+                        }
+                        val queue = pendingQueue
+                        if (queue == null) {
+                            publish(mediaController, includeQueue = true)
+                        } else {
                             pendingQueue = null
                             startPlayback(mediaController, queue.tracks, queue.startIndex)
                         }
+                        startPositionUpdates()
                     }
                     .onFailure { error ->
                         _state.value = _state.value.copy(
@@ -134,7 +141,14 @@ class PlayerConnection @Inject constructor(
     }
 
     fun setVolume(volume: Float) {
-        controller?.volume = volume.coerceIn(0f, 1f)
+        val safeVolume = volume.coerceIn(0f, 1f)
+        _state.value = _state.value.copy(volume = safeVolume)
+        val mediaController = controller
+        if (mediaController == null) {
+            pendingVolume = safeVolume
+        } else {
+            mediaController.volume = safeVolume
+        }
     }
 
     fun toggleFavourite() {
@@ -207,14 +221,23 @@ class PlayerConnection @Inject constructor(
     private fun publish(player: Player, includeQueue: Boolean) {
         val currentState = _state.value
         val mediaItem = player.currentMediaItem
-        val metadata = mediaItem?.mediaMetadata
+        if (mediaItem == null) {
+            _state.value = PlayerUiState(
+                volume = player.volume.coerceIn(0f, 1f),
+                queue = if (includeQueue) queueSnapshot(player) else emptyList(),
+                errorMessage = currentState.errorMessage,
+            )
+            return
+        }
+
+        val metadata = mediaItem.mediaMetadata
         _state.value = currentState.copy(
-            title = metadata?.title?.toString() ?: currentState.title,
-            artist = metadata?.artist?.toString() ?: currentState.artist,
-            album = metadata?.albumTitle?.toString() ?: currentState.album,
-            mediaUri = mediaItem?.localConfiguration?.uri?.toString() ?: currentState.mediaUri,
-            artworkUri = metadata?.artworkUri?.toString() ?: currentState.artworkUri,
-            isFavourite = metadata?.extras
+            title = metadata.title?.toString(),
+            artist = metadata.artist?.toString(),
+            album = metadata.albumTitle?.toString(),
+            mediaUri = mediaItem.localConfiguration?.uri?.toString(),
+            artworkUri = metadata.artworkUri?.toString(),
+            isFavourite = metadata.extras
                 ?.getBoolean(MediaSessionCommands.METADATA_IS_FAVOURITE, false)
                 ?: false,
             isPlaying = player.isPlaying,
