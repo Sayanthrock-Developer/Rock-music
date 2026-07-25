@@ -68,6 +68,22 @@ class ManifestValidationTest(unittest.TestCase):
         with self.assertRaisesRegex(VALIDATOR.ValidationError, "credential"):
             VALIDATOR.validate_manifest(manifest)
 
+    def test_all_github_token_prefixes_fail(self) -> None:
+        token_prefixes = (
+            "github_pat_",
+            "ghp_",
+            "gho_",
+            "ghu_",
+            "ghs_",
+            "ghr_",
+        )
+        for prefix in token_prefixes:
+            with self.subTest(prefix=prefix):
+                manifest = safe_manifest()
+                manifest["description"] = f"{prefix}example"
+                with self.assertRaisesRegex(VALIDATOR.ValidationError, "credential"):
+                    VALIDATOR.validate_manifest(manifest)
+
     def test_secret_bearing_field_fails(self) -> None:
         manifest = safe_manifest()
         manifest["webhook_secret"] = "not-a-real-secret"
