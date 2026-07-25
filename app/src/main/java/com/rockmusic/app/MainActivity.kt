@@ -25,8 +25,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.rockmusic.app.player.MediaSessionCommands
 import com.rockmusic.app.presentation.FolderManagerScreen
-import com.rockmusic.app.presentation.RockMusicExperience
 import com.rockmusic.app.presentation.SongManagerScreen
+import com.rockmusic.app.presentation.SystemMediaExperience
 import com.rockmusic.app.presentation.integrations.IntegrationConnectionsScreen
 import com.rockmusic.app.presentation.settings.AppearanceScreen
 import com.rockmusic.app.presentation.theme.AppearancePreferences
@@ -120,7 +120,7 @@ class MainActivity : ComponentActivity() {
                         )
 
                         else -> key(audioPermissionGranted) {
-                            RockMusicExperience(
+                            SystemMediaExperience(
                                 useBlurFrames = appearance.useBlurFrames,
                                 requestedPlayerSurface = requestedPlayerSurface,
                                 onRequestedPlayerSurfaceConsumed = {
