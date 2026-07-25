@@ -69,6 +69,16 @@ Provider-controlled playback or offline access is handed to the official provide
 
 See [docs/COMPLIANCE.md](docs/COMPLIANCE.md) for the complete policy.
 
+## GitHub App
+
+The repository includes a least-privilege GitHub App manifest for read-only release, workflow, check, pull-request, issue, and repository metadata access.
+
+- Manifest: [`.github/github-app-manifest.json`](.github/github-app-manifest.json)
+- Registration and security guide: [`docs/GITHUB_APP_SETUP.md`](docs/GITHUB_APP_SETUP.md)
+- Backend environment template: [`docs/github-app.env.example`](docs/github-app.env.example)
+
+The GitHub App private key, webhook secret, installation tokens, and client secret must remain on a trusted backend. They must never be committed or embedded in the Android APK.
+
 ## Build
 
 Install JDK 17 and Android SDK 36, then run:
