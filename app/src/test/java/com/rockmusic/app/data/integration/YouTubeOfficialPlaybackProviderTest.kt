@@ -11,11 +11,11 @@ class YouTubeOfficialPlaybackProviderTest {
     @Test
     fun `accepts official youtube music links`() {
         val result = provider.openTrack("https://music.youtube.com/watch?v=track123")
+        val success = result as ProviderCallResult.Success<*>
 
-        assertTrue(result is ProviderCallResult.Success)
         assertEquals(
             "https://music.youtube.com/watch?v=track123",
-            (result as ProviderCallResult.Success).value,
+            success.value,
         )
     }
 
@@ -30,10 +30,10 @@ class YouTubeOfficialPlaybackProviderTest {
     @Test
     fun `builds an official youtube music search link`() {
         val result = provider.openSearch("Daft Punk One More Time")
+        val success = result as ProviderCallResult.Success<*>
 
-        assertTrue(result is ProviderCallResult.Success)
         assertTrue(
-            (result as ProviderCallResult.Success).value
+            success.value.toString()
                 .startsWith("https://music.youtube.com/search?q="),
         )
     }
