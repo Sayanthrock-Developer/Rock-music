@@ -21,6 +21,8 @@ enum class IntegrationId {
 }
 
 sealed interface IntegrationAvailability {
+    data object Locked : IntegrationAvailability
+
     data object Available : IntegrationAvailability
 
     data class Unconfigured(
