@@ -10,6 +10,7 @@ import javax.inject.Singleton
 @Singleton
 class SecureProviderConfigurationStore @Inject constructor(
     private val vault: TokenVault,
+    private val authorizationStore: IntegrationAuthorizationStore,
 ) {
     fun value(key: ProviderConfigKey): String =
         vault.get(valueKey(key)).orEmpty().trim()
@@ -31,20 +32,32 @@ class SecureProviderConfigurationStore @Inject constructor(
         }
 
         val definition = ProviderDefinitions.all.first { it.id == id }
+        val previousValues = definition.requiredConfiguration.associateWith { key ->
+            value(key).ifBlank { fallback.value(key).trim() }
+        }
         val normalized = definition.requiredConfiguration.associateWith { key ->
             suppliedValues[key]?.trim().orEmpty()
-                .ifBlank { value(key) }
-                .ifBlank { fallback.value(key).trim() }
+                .ifBlank { previousValues[key].orEmpty() }
         }
         val missing = normalized.filterValues(String::isBlank).keys
         require(missing.isEmpty()) {
             "Missing: ${missing.joinToString { it.propertyName }}"
         }
-        normalized.forEach { (key, value) ->
-            ProviderConfigurationValidator.validate(key, value)
-            if (suppliedValues[key]?.isNotBlank() == true) {
-                vault.put(valueKey(key), value)
-            }
+
+        normalized.forEach { (key, configuredValue) ->
+            ProviderConfigurationValidator.validate(key, configuredValue)
+        }
+
+        val suppliedOverrides = normalized.filterKeys { key ->
+            suppliedValues[key]?.isNotBlank() == true
+        }
+        val configurationChanged = suppliedOverrides.any { (key, configuredValue) ->
+            configuredValue != previousValues[key]
+        }
+        if (configurationChanged) authorizationStore.clear(id)
+
+        suppliedOverrides.forEach { (key, configuredValue) ->
+            vault.put(valueKey(key), configuredValue)
         }
         vault.put(stateKey(id), STATE_UNLOCKED)
     }
