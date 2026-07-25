@@ -14,6 +14,12 @@
 - [x] Shared provider capability and explicit availability-state contract
 - [x] Accessible unavailable-state Compose component
 - [x] GPL-3.0-only and compliance documentation
+- [x] Central `MediaActionPolicyEngine`
+- [x] Source-aware play/download/share/recognition/room decisions
+- [x] Official-provider handoff decision path
+- [x] Cached-versus-remote offline distinction
+- [x] Existing local playback routed through the policy engine
+- [x] Shared media-action decision UI and unit tests
 
 ## Phase 2 — Local music and library
 
@@ -24,6 +30,7 @@
 - [ ] Gapless playback, ReplayGain, crossfade, equalizer, bass boost, and loudness controls
 - [ ] Media notification custom commands, Android Auto, audio output selector, and headset controls
 - [ ] Persistent queue, shuffle/repeat memory, sleep timer, mono audio, and fade controls
+- [ ] Route every local playback, share, export, ringtone, and file action through `MediaActionPolicyEngine`
 - [ ] Loading, empty, offline, error, retry, accessibility, unit-test, and UI-test coverage
 
 ## Phase 3 — Podcasts and permitted offline downloads
@@ -34,7 +41,8 @@
 - [ ] WorkManager download queue with pause, resume, retry, Wi-Fi policy, cleanup, and storage dashboard
 - [ ] Smart downloads, offline-only mode, quality selection, and storage location
 - [ ] Item-level capability checks that block downloads when a source does not grant permission
-- [ ] Revalidation before download resume/retry and clear provider denial reasons
+- [ ] Revalidation before download start, resume, and retry with clear provider denial reasons
+- [ ] Route podcast playback and every download command through `MediaActionPolicyEngine`
 - [ ] Loading, empty, offline, error, retry, accessibility, unit-test, and UI-test coverage
 
 ## Phase 4 — Lyrics and visuals
@@ -46,6 +54,7 @@
 - [ ] Provider priority and explicit unavailable/error states
 - [ ] Battery-aware gradients, artwork motion, particles, artist canvas, and waveform modes
 - [ ] Reduced-motion, battery-saver, and high-refresh-rate behaviour
+- [ ] Route provider lyric fetches and translations through configured integration availability
 - [ ] Loading, empty, offline, error, retry, accessibility, unit-test, and UI-test coverage
 
 ## Phase 5 — Connected services
@@ -59,6 +68,7 @@
 - [ ] Optional Discord activity sharing through an official supported SDK/API
 - [ ] Public client-ID and redirect-URI build configuration; no mobile client secrets
 - [ ] Explicit unconfigured, authentication-required, offline, unsupported, and error states
+- [ ] Route catalogue playback, official handoff, cloud downloads, sharing, and Discord activity through `MediaActionPolicyEngine`
 - [ ] Loading, empty, offline, error, retry, accessibility, unit-test, and UI-test coverage
 
 ## Phase 6 — Echo Find and Listen Together
@@ -73,6 +83,7 @@
 - [ ] Clock-offset estimation and bounded adjustable drift correction
 - [ ] Per-participant legal-access validation
 - [ ] Explicit unconfigured and unavailable states when backend URLs or credentials are absent
+- [ ] Route recognition start, result opening, room creation, room join, and synced playback through `MediaActionPolicyEngine`
 - [ ] Loading, empty, offline, error, retry, accessibility, unit-test, and UI-test coverage
 
 ## Phase 7 — Privacy, accessibility, release hardening
@@ -83,10 +94,11 @@
 - [ ] High contrast, scalable text, reduced motion, colour-safe status, and tablet keyboard navigation
 - [ ] Phone, tablet, foldable, landscape, and Android Auto validation
 - [ ] Dependency, licence, privacy, and source-availability review for GPL releases
+- [ ] Policy-bypass static checks and architecture tests
 - [ ] Signed release workflow, APK artifact validation, and reproducible release notes
 
 ## Definition of done
 
-A feature is complete only when its real implementation is connected and it has loading, empty, offline, error, retry, permission, accessibility, unit-test, UI-test, privacy, analytics-boundary, provider-capability, and external-service fallback coverage.
+A feature is complete only when its real implementation is connected and it has loading, empty, offline, error, retry, permission, accessibility, unit-test, UI-test, privacy, analytics-boundary, provider-capability, action-policy, and external-service fallback coverage.
 
-A screen, button, placeholder, sample response, generated room code, fake OAuth code, or stubbed provider result does not count as implementation.
+A screen, button, placeholder, sample response, generated room code, fake OAuth code, stubbed provider result, or direct provider call that bypasses `MediaActionPolicyEngine` does not count as implementation.
