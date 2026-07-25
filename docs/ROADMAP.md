@@ -28,7 +28,7 @@
 
 ## Phase 2 — Local music and library
 
-- [ ] Folder browsing and exclusion
+- [x] Folder browsing and exclusion
 - [ ] Embedded artwork and metadata editing
 - [ ] Duplicate detection
 - [ ] Playlists, favourites, history, sorting, filtering, folders, and bulk selection
