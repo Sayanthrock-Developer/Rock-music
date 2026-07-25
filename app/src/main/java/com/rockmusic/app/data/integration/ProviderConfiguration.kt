@@ -87,10 +87,9 @@ class RuntimeProviderConfigurationSource @Inject constructor(
     override fun value(key: ProviderConfigKey): String = buildConfig.value(key)
 
     fun isUnlocked(id: IntegrationId): Boolean {
-        secureStore.explicitUnlockState(id)?.let { return it }
+        if (secureStore.explicitUnlockState(id) == false) return false
         if (id == IntegrationId.OFFICIAL_YOUTUBE) return true
-        val required = ProviderDefinitions.all.first { it.id == id }.requiredConfiguration
-        return required.isNotEmpty() && missing(required).isEmpty()
+        return hasCompleteConfiguration(id)
     }
 
     fun unlock(
@@ -102,8 +101,16 @@ class RuntimeProviderConfigurationSource @Inject constructor(
 
     fun reset(id: IntegrationId) = secureStore.reset(id)
 
-    fun hasCompleteConfiguration(id: IntegrationId): Boolean {
-        val required = ProviderDefinitions.all.first { it.id == id }.requiredConfiguration
-        return missing(required).isEmpty()
+    fun hasCompleteConfiguration(id: IntegrationId): Boolean =
+        validateConfiguration(id).isSuccess
+
+    fun validateConfiguration(id: IntegrationId): Result<Unit> = runCatching {
+        ProviderDefinitions.all.first { it.id == id }
+            .requiredConfiguration
+            .forEach { key ->
+                val configuredValue = value(key)
+                require(configuredValue.isNotBlank()) { "${key.propertyName} is not configured" }
+                ProviderConfigurationValidator.validate(key, configuredValue)
+            }
     }
 }
