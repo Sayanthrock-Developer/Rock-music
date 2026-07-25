@@ -34,6 +34,8 @@ android {
         buildConfigField("String", "ROCK_LISTEN_TOGETHER_REST_URL", providers.stringBuildConfig("ROCK_LISTEN_TOGETHER_REST_URL"))
         buildConfigField("String", "ROCK_LISTEN_TOGETHER_WS_URL", providers.stringBuildConfig("ROCK_LISTEN_TOGETHER_WS_URL"))
         buildConfigField("String", "ROCK_DISCORD_CLIENT_ID", providers.stringBuildConfig("ROCK_DISCORD_CLIENT_ID"))
+        buildConfigField("String", "ROCK_DISCORD_REDIRECT_URI", providers.stringBuildConfig("ROCK_DISCORD_REDIRECT_URI"))
+        buildConfigField("String", "ROCK_DISCORD_ACTIVITY_BACKEND_URL", providers.stringBuildConfig("ROCK_DISCORD_ACTIVITY_BACKEND_URL"))
         buildConfigField("String", "ROCK_CATALOGUE_BASE_URL", providers.stringBuildConfig("ROCK_CATALOGUE_BASE_URL"))
         buildConfigField("String", "ROCK_CATALOGUE_API_KEY", providers.stringBuildConfig("ROCK_CATALOGUE_API_KEY"))
         buildConfigField("String", "ROCK_LYRICS_BASE_URL", providers.stringBuildConfig("ROCK_LYRICS_BASE_URL"))
