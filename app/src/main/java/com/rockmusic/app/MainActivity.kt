@@ -17,6 +17,7 @@ import com.rockmusic.app.presentation.RockMusicRoot
 import com.rockmusic.app.presentation.integrations.IntegrationConnectionsScreen
 import com.rockmusic.app.presentation.settings.AppearanceScreen
 import com.rockmusic.app.presentation.theme.AppearancePreferences
+import com.rockmusic.app.presentation.theme.AppearanceSettingsSaver
 import com.rockmusic.app.presentation.theme.RockMusicTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -27,7 +28,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val appearancePreferences = remember { AppearancePreferences(applicationContext) }
-            var appearance by remember { mutableStateOf(appearancePreferences.load()) }
+            var appearance by rememberSaveable(stateSaver = AppearanceSettingsSaver) {
+                mutableStateOf(appearancePreferences.load())
+            }
             var showConnections by rememberSaveable { mutableStateOf(false) }
             var showAppearance by rememberSaveable { mutableStateOf(false) }
 
