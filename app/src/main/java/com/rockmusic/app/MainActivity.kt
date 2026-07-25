@@ -1,6 +1,7 @@
 package com.rockmusic.app
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -22,6 +23,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.rockmusic.app.player.MediaSessionCommands
 import com.rockmusic.app.presentation.FolderManagerScreen
 import com.rockmusic.app.presentation.RockMusicExperience
 import com.rockmusic.app.presentation.SongManagerScreen
@@ -34,12 +36,18 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private val externalPlayerSurface = mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        externalPlayerSurface.value = intent?.getStringExtra(
+            MediaSessionCommands.EXTRA_OPEN_PLAYER_SURFACE,
+        )
         enableEdgeToEdge()
         setContent {
             val appearancePreferences = remember { AppearancePreferences(applicationContext) }
             val lifecycleOwner = LocalLifecycleOwner.current
+            val requestedPlayerSurface by externalPlayerSurface
             val audioPermission = if (Build.VERSION.SDK_INT >= 33) {
                 Manifest.permission.READ_MEDIA_AUDIO
             } else {
@@ -114,6 +122,10 @@ class MainActivity : ComponentActivity() {
                         else -> key(audioPermissionGranted) {
                             RockMusicExperience(
                                 useBlurFrames = appearance.useBlurFrames,
+                                requestedPlayerSurface = requestedPlayerSurface,
+                                onRequestedPlayerSurfaceConsumed = {
+                                    externalPlayerSurface.value = null
+                                },
                                 onOpenAppearance = { showAppearance = true },
                                 onOpenConnections = { showConnections = true },
                                 onOpenSongManager = { showSongManager = true },
@@ -124,5 +136,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        externalPlayerSurface.value = intent.getStringExtra(
+            MediaSessionCommands.EXTRA_OPEN_PLAYER_SURFACE,
+        )
     }
 }
