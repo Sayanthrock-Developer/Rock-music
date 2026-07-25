@@ -17,6 +17,7 @@ import androidx.media3.session.MediaSession.ConnectionResult.AcceptedResultBuild
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionCommands
+import androidx.media3.session.SessionError
 import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
@@ -103,14 +104,14 @@ class MusicService : MediaSessionService() {
         ): ListenableFuture<SessionResult> {
             if (!controller.isTrusted) {
                 return Futures.immediateFuture(
-                    SessionResult(SessionResult.RESULT_ERROR_PERMISSION_DENIED),
+                    SessionResult(SessionError.ERROR_PERMISSION_DENIED),
                 )
             }
             return when (customCommand.customAction) {
                 MediaSessionCommands.ACTION_TOGGLE_FAVOURITE -> {
                     val current = player.currentMediaItem
                     if (current == null) {
-                        Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE))
+                        Futures.immediateFuture(SessionResult(SessionError.ERROR_BAD_VALUE))
                     } else {
                         favouriteStore.toggle(current.mediaId)
                         syncFavouriteMetadata(current)
