@@ -8,18 +8,18 @@ import org.junit.Test
 
 class SystemMediaStateTest {
     @Test
-    fun `system media custom actions are stable and distinct`() {
+    fun `system media custom action constants are stable and distinct`() {
         assertEquals(
             "com.rockmusic.app.action.TOGGLE_FAVOURITE",
-            MediaSessionCommands.toggleFavourite.customAction,
+            MediaSessionCommands.ACTION_TOGGLE_FAVOURITE,
         )
         assertEquals(
             "com.rockmusic.app.action.OPEN_LYRICS",
-            MediaSessionCommands.openLyrics.customAction,
+            MediaSessionCommands.ACTION_OPEN_LYRICS,
         )
         assertNotEquals(
-            MediaSessionCommands.toggleFavourite.customAction,
-            MediaSessionCommands.openLyrics.customAction,
+            MediaSessionCommands.ACTION_TOGGLE_FAVOURITE,
+            MediaSessionCommands.ACTION_OPEN_LYRICS,
         )
     }
 
