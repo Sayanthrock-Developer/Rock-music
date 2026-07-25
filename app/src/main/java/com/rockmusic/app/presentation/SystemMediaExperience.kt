@@ -55,6 +55,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -65,6 +67,7 @@ import com.rockmusic.app.player.MediaSessionCommands
 import com.rockmusic.app.player.PlayerQueueItem
 import com.rockmusic.app.player.PlayerUiState
 import com.rockmusic.app.player.SystemAudioRoute
+import java.util.Locale
 
 private enum class PlayerPanel(val label: String) {
     QUEUE("Queue"),
@@ -196,8 +199,8 @@ private fun MediaPill(
                     )
                 } else {
                     Icon(
-                        if (player.isPlaying) Icons.Rounded.GraphicEq else Icons.Rounded.PlayArrow,
-                        contentDescription = "Play or pause",
+                        if (player.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = if (player.isPlaying) "Pause" else "Play",
                         tint = MaterialTheme.colorScheme.inverseOnSurface,
                     )
                 }
@@ -223,6 +226,9 @@ private fun ExpandedSystemPlayer(
     onQueueItem: (Int) -> Unit,
     onRoute: (Int) -> Unit,
 ) {
+    var draggedPosition by rememberSaveable(player.mediaUri) { mutableStateOf<Float?>(null) }
+    var draggedVolume by rememberSaveable { mutableStateOf<Float?>(null) }
+
     BackHandler(onBack = onClose)
     LazyColumn(
         modifier = Modifier
@@ -241,118 +247,146 @@ private fun ExpandedSystemPlayer(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Media player", style = MaterialTheme.typography.headlineSmall)
-                    Text("Rock Music system controls", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                IconButton(onClick = { onPanel(PlayerPanel.OUTPUT) }) {
-                    Icon(Icons.Rounded.Speaker, contentDescription = "Choose audio output")
-                }
-                IconButton(onClick = onClose) {
-                    Icon(Icons.Rounded.Close, contentDescription = "Close media player")
-                }
-            }
+            PlayerHeader(onOutput = { onPanel(PlayerPanel.OUTPUT) }, onClose = onClose)
         }
-
         item {
-            Surface(
-                shape = RoundedCornerShape(34.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                shadowElevation = 8.dp,
-            ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Artwork(
-                        player.artworkUri,
-                        player.title.orEmpty(),
-                        Modifier
-                            .fillMaxWidth()
-                            .height(320.dp),
-                        28,
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        player.title.orEmpty(),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Black,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        player.artist.orEmpty(),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(Modifier.height(14.dp))
-                    Slider(
-                        value = player.positionMs.coerceAtMost(player.durationMs).toFloat(),
-                        onValueChange = { onSeek(it.toLong()) },
-                        valueRange = 0f..player.durationMs.coerceAtLeast(1L).toFloat(),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Row(Modifier.fillMaxWidth()) {
-                        Text(duration(player.positionMs))
-                        Spacer(Modifier.weight(1f))
-                        Text(duration(player.durationMs))
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    PlaybackButtons(
-                        player = player,
-                        onFavourite = onFavourite,
-                        onPrevious = onPrevious,
-                        onToggle = onToggle,
-                        onNext = onNext,
-                        onLyrics = { onPanel(PlayerPanel.LYRICS) },
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.VolumeDown, contentDescription = null)
-                        Slider(
-                            value = player.volume,
-                            onValueChange = onVolume,
-                            valueRange = 0f..1f,
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 10.dp),
-                        )
-                        Icon(Icons.Rounded.VolumeUp, contentDescription = null)
-                    }
-                }
-            }
+            PlayerCard(
+                player = player,
+                draggedPosition = draggedPosition,
+                onDraggedPosition = { draggedPosition = it },
+                onPositionFinished = {
+                    draggedPosition?.let { onSeek(it.toLong()) }
+                    draggedPosition = null
+                },
+                draggedVolume = draggedVolume,
+                onDraggedVolume = { draggedVolume = it },
+                onVolumeFinished = {
+                    draggedVolume?.let(onVolume)
+                    draggedVolume = null
+                },
+                onFavourite = onFavourite,
+                onPrevious = onPrevious,
+                onToggle = onToggle,
+                onNext = onNext,
+                onLyrics = { onPanel(PlayerPanel.LYRICS) },
+            )
         }
-
         item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(PlayerPanel.entries, key = PlayerPanel::name) { option ->
-                    FilterChip(
-                        selected = selectedPanel == option,
-                        onClick = { onPanel(option) },
-                        label = { Text(option.label) },
-                        leadingIcon = {
-                            Icon(
-                                when (option) {
-                                    PlayerPanel.QUEUE -> Icons.Rounded.QueueMusic
-                                    PlayerPanel.LYRICS -> Icons.Rounded.Subtitles
-                                    PlayerPanel.OUTPUT -> Icons.Rounded.Speaker
-                                },
-                                contentDescription = null,
-                            )
-                        },
-                    )
-                }
-            }
+            PanelSelector(selected = selectedPanel, onPanel = onPanel)
         }
-
         item {
             when (selectedPanel) {
                 PlayerPanel.QUEUE -> QueuePanel(player.queue, player.currentQueueIndex, onQueueItem)
                 PlayerPanel.LYRICS -> LyricsPanel(lyrics)
                 PlayerPanel.OUTPUT -> OutputPanel(routes, onRoute)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlayerHeader(onOutput: () -> Unit, onClose: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Media player", style = MaterialTheme.typography.headlineSmall)
+            Text("Rock Music system controls", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        IconButton(onClick = onOutput) {
+            Icon(Icons.Rounded.Speaker, contentDescription = "Choose audio output")
+        }
+        IconButton(onClick = onClose) {
+            Icon(Icons.Rounded.Close, contentDescription = "Close media player")
+        }
+    }
+}
+
+@Composable
+private fun PlayerCard(
+    player: PlayerUiState,
+    draggedPosition: Float?,
+    onDraggedPosition: (Float) -> Unit,
+    onPositionFinished: () -> Unit,
+    draggedVolume: Float?,
+    onDraggedVolume: (Float) -> Unit,
+    onVolumeFinished: () -> Unit,
+    onFavourite: () -> Unit,
+    onPrevious: () -> Unit,
+    onToggle: () -> Unit,
+    onNext: () -> Unit,
+    onLyrics: () -> Unit,
+) {
+    val positionValue = draggedPosition
+        ?: player.positionMs.coerceAtMost(player.durationMs).toFloat()
+    val volumeValue = draggedVolume ?: player.volume
+
+    Surface(
+        shape = RoundedCornerShape(34.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shadowElevation = 8.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Artwork(
+                player.artworkUri,
+                player.title.orEmpty(),
+                Modifier
+                    .fillMaxWidth()
+                    .height(320.dp),
+                28,
+            )
+            Spacer(Modifier.height(16.dp))
+            Text(
+                player.title.orEmpty(),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                player.artist.orEmpty(),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(14.dp))
+            Slider(
+                value = positionValue,
+                onValueChange = onDraggedPosition,
+                onValueChangeFinished = onPositionFinished,
+                valueRange = 0f..player.durationMs.coerceAtLeast(1L).toFloat(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(Modifier.fillMaxWidth()) {
+                Text(duration(positionValue.toLong()))
+                Spacer(Modifier.weight(1f))
+                Text(duration(player.durationMs))
+            }
+            Spacer(Modifier.height(10.dp))
+            PlaybackButtons(
+                player = player,
+                onFavourite = onFavourite,
+                onPrevious = onPrevious,
+                onToggle = onToggle,
+                onNext = onNext,
+                onLyrics = onLyrics,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.VolumeDown, contentDescription = null)
+                Slider(
+                    value = volumeValue,
+                    onValueChange = onDraggedVolume,
+                    onValueChangeFinished = onVolumeFinished,
+                    valueRange = 0f..1f,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 10.dp)
+                        .semantics { contentDescription = "Playback volume" },
+                )
+                Icon(Icons.Rounded.VolumeUp, contentDescription = null)
             }
         }
     }
@@ -395,7 +429,7 @@ private fun PlaybackButtons(
             } else {
                 Icon(
                     if (player.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    contentDescription = "Play or pause",
+                    contentDescription = if (player.isPlaying) "Pause" else "Play",
                     modifier = Modifier.size(36.dp),
                 )
             }
@@ -405,6 +439,29 @@ private fun PlaybackButtons(
         }
         IconButton(onClick = onLyrics) {
             Icon(Icons.Rounded.Subtitles, contentDescription = "Open lyrics")
+        }
+    }
+}
+
+@Composable
+private fun PanelSelector(selected: PlayerPanel, onPanel: (PlayerPanel) -> Unit) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(PlayerPanel.entries, key = PlayerPanel::name) { option ->
+            FilterChip(
+                selected = selected == option,
+                onClick = { onPanel(option) },
+                label = { Text(option.label) },
+                leadingIcon = {
+                    Icon(
+                        when (option) {
+                            PlayerPanel.QUEUE -> Icons.Rounded.QueueMusic
+                            PlayerPanel.LYRICS -> Icons.Rounded.Subtitles
+                            PlayerPanel.OUTPUT -> Icons.Rounded.Speaker
+                        },
+                        contentDescription = null,
+                    )
+                },
+            )
         }
     }
 }
@@ -438,11 +495,17 @@ private fun QueuePanel(
                         Artwork(item.artworkUri, item.title, Modifier.size(48.dp), 14)
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(item.title, fontWeight = FontWeight.Bold, maxLines = 1)
+                            Text(
+                                item.title,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                             Text(
                                 item.artist,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                         if (index == currentIndex) {
@@ -514,7 +577,7 @@ private fun RouteRow(route: SystemAudioRoute, onRoute: (Int) -> Unit) {
 }
 
 @Composable
-private fun PanelSurface(title: String, content: @Composable Column.() -> Unit) {
+private fun PanelSurface(title: String, content: @Composable () -> Unit) {
     Surface(shape = RoundedCornerShape(26.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -527,12 +590,7 @@ private fun PanelSurface(title: String, content: @Composable Column.() -> Unit) 
 }
 
 @Composable
-private fun Artwork(
-    uri: String?,
-    title: String,
-    modifier: Modifier,
-    radius: Int,
-) {
+private fun Artwork(uri: String?, title: String, modifier: Modifier, radius: Int) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(radius.dp))
@@ -561,5 +619,15 @@ private fun Artwork(
 
 private fun duration(valueMs: Long): String {
     val seconds = valueMs.coerceAtLeast(0L) / 1_000L
-    return "%d:%02d".format(seconds / 60L, seconds % 60L)
+    return if (seconds >= 3_600L) {
+        String.format(
+            Locale.ROOT,
+            "%d:%02d:%02d",
+            seconds / 3_600L,
+            (seconds % 3_600L) / 60L,
+            seconds % 60L,
+        )
+    } else {
+        String.format(Locale.ROOT, "%d:%02d", seconds / 60L, seconds % 60L)
+    }
 }
