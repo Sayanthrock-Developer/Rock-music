@@ -17,7 +17,7 @@ Rock Music is a premium native Android music platform built with Kotlin, Jetpack
 
 ## How actions work
 
-Rock Music now uses a single source-aware policy engine for playback, downloads, sharing, recognition, official-provider handoff, and listening rooms.
+Rock Music uses a single source-aware policy engine for playback, downloads, sharing, recognition, official-provider handoff, and listening rooms.
 
 Every action identifies the media origin, resolves provider access and permissions, and receives one decision:
 
@@ -28,28 +28,36 @@ Every action identifies the media origin, resolves provider access and permissio
 - report offline;
 - block with a clear reason.
 
-The current local-library playback path already uses this policy. New provider integrations, download workers, Echo Find, and Listen Together must use the same boundary and may not call services directly from UI code.
+The current local-library playback path already uses this policy. Provider adapters, download workers, Echo Find, and Listen Together must use the same boundary and may not call services directly from UI code.
 
 See [docs/OPERATING_MODEL.md](docs/OPERATING_MODEL.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-## Integration contract
+## Provider adapters
 
-Rock Music will include all requested provider-backed options:
+Rock Music now includes typed adapter definitions, configuration keys, capability contracts, service interfaces, registry status, tests, and an in-app Connections screen for:
 
-- Spotify OAuth playlist-metadata import
-- Licensed Echo Find recognition
-- Listen Together REST and WebSocket rooms
-- Optional Discord listening activity
-- Licensed music-service adapters
-- Synchronized lyrics providers
-- Podcast-directory search
-- Provider-permitted offline downloads
-- User-authorised cloud storage
-- Official YouTube and YouTube Music playback or deep links
+- Spotify OAuth PKCE playlist-metadata import;
+- licensed Echo Find recognition;
+- Listen Together REST and WebSocket rooms;
+- optional Discord listening activity;
+- licensed music-service catalogues;
+- synchronized lyrics providers;
+- podcast-directory search;
+- provider-permitted downloads;
+- user-authorised cloud storage;
+- official YouTube and YouTube Music playback or deep links.
 
-Every integration must report an explicit state before its controls become actionable: available, unconfigured, authentication required, offline, unsupported, or error. Missing credentials and services are shown as unavailable; Rock Music never fabricates a connection, recognition result, room, import, download, or sharing success.
+Open the Connections button in the app to see which adapters are available, require sign-in, or are missing configuration.
 
-See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) for configuration keys, capability contracts, privacy requirements, and fallback behaviour.
+Empty configuration is supported for CI and FOSS builds. A missing provider displays `Unconfigured`; an OAuth provider with public app configuration displays `AuthenticationRequired` until the user authorises it. Rock Music never fabricates a connection, recognition result, room, import, download, or sharing success.
+
+The adapter foundations do not include provider credentials or hosted backend services. Real remote operations become available only after legitimate public client configuration, user authorisation, licensed endpoints, connectivity checks, entitlement checks and policy-engine approval.
+
+See:
+
+- [docs/PROVIDER_CONFIGURATION.md](docs/PROVIDER_CONFIGURATION.md)
+- [docs/provider-config.properties.example](docs/provider-config.properties.example)
+- [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)
 
 ## Compliance boundary
 
@@ -69,11 +77,13 @@ Install JDK 17 and Android SDK 36, then run:
 gradle :app:assembleDebug
 ```
 
+Provider values can be supplied through `~/.gradle/gradle.properties`, CI variables/secrets, or `-P` command-line properties. Private provider secrets must stay on a licensed backend and must not be embedded in the Android APK.
+
 The CI workflow installs Gradle automatically. A Gradle wrapper can be generated later with `gradle wrapper` and committed with the wrapper JAR.
 
 ## Delivery plan
 
-The native foundation and source-aware action policy are implemented. Provider-backed services and the complete local, podcast, lyrics, download, Echo Find, and Listen Together experiences remain tracked work and are not considered complete until their tests and fallback states pass.
+The native foundation, source-aware action policy, provider definitions, configuration registry, Connections UI, and service contracts are implemented. Real provider clients, hosted backends, OAuth callback completion, download workers, synchronized room transport, and production credentials remain tracked work and are not considered complete until their integration tests and fallback states pass.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md).
 
