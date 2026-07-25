@@ -62,10 +62,10 @@ object SpotifyPlaylistReferenceParser {
 
             else -> {
                 val uri = URI(value)
-                require(uri.scheme.equals("https", ignoreCase = true)) {
+                require("https".equals(uri.scheme, ignoreCase = true)) {
                     "Spotify playlist links must use HTTPS."
                 }
-                require(uri.host.equals("open.spotify.com", ignoreCase = true)) {
+                require("open.spotify.com".equals(uri.host, ignoreCase = true)) {
                     "Only open.spotify.com playlist links are supported."
                 }
                 require(
