@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -64,6 +63,7 @@ internal fun SpotifyPlaylistPreviewCard(
                 value = reference,
                 onValueChange = onReferenceChange,
                 modifier = Modifier.fillMaxWidth(),
+                enabled = !isBusy,
                 label = { Text("Spotify playlist link or URI") },
                 supportingText = {
                     Text("Example: open.spotify.com/playlist/... or spotify:playlist:...")
@@ -208,7 +208,7 @@ private fun SpotifyTrackRow(index: Int, track: SpotifyPlaylistTrackPreview) {
 }
 
 private fun formatDuration(durationMs: Long): String {
-    val totalSeconds = (durationMs.coerceAtLeast(0L) / 1_000L)
+    val totalSeconds = durationMs.coerceAtLeast(0L) / 1_000L
     val minutes = totalSeconds / 60L
     val seconds = totalSeconds % 60L
     return "%d:%02d".format(minutes, seconds)
