@@ -5,28 +5,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.LibraryMusic
-import androidx.compose.material3.Icon
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.rockmusic.app.presentation.FolderManagerScreen
-import com.rockmusic.app.presentation.RockMusicRoot
 import com.rockmusic.app.presentation.SongManagerScreen
+import com.rockmusic.app.presentation.UnifiedMusicRoot
 import com.rockmusic.app.presentation.integrations.IntegrationConnectionsScreen
 import com.rockmusic.app.presentation.settings.AppearanceScreen
 import com.rockmusic.app.presentation.theme.AppearancePreferences
@@ -86,37 +75,13 @@ class MainActivity : ComponentActivity() {
                             onClose = { showConnections = false },
                         )
 
-                        else -> {
-                            RockMusicRoot(
-                                useBlurFrames = appearance.useBlurFrames,
-                                onOpenAppearance = { showAppearance = true },
-                                onOpenConnections = { showConnections = true },
-                            )
-                            Column(
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .statusBarsPadding()
-                                    .padding(top = 8.dp, end = 14.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                SmallFloatingActionButton(
-                                    onClick = { showFolderManager = true },
-                                ) {
-                                    Icon(
-                                        Icons.Rounded.Folder,
-                                        contentDescription = "Open Folder Manager",
-                                    )
-                                }
-                                SmallFloatingActionButton(
-                                    onClick = { showSongManager = true },
-                                ) {
-                                    Icon(
-                                        Icons.Rounded.LibraryMusic,
-                                        contentDescription = "Open Song Manager",
-                                    )
-                                }
-                            }
-                        }
+                        else -> UnifiedMusicRoot(
+                            useBlurFrames = appearance.useBlurFrames,
+                            onOpenAppearance = { showAppearance = true },
+                            onOpenConnections = { showConnections = true },
+                            onOpenSongManager = { showSongManager = true },
+                            onOpenFolderManager = { showFolderManager = true },
+                        )
                     }
                 }
             }
