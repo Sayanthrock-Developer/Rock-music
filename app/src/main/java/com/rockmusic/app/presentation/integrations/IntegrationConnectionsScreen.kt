@@ -58,6 +58,9 @@ import com.rockmusic.app.data.integration.IntegrationRegistry
 import com.rockmusic.app.data.integration.IntegrationSnapshot
 import com.rockmusic.app.data.integration.ProviderConfigKey
 import com.rockmusic.app.data.integration.SpotifyPkceRequestFactory
+import com.rockmusic.app.data.integration.SpotifyPlaylistClient
+import com.rockmusic.app.data.integration.SpotifyPlaylistPreview
+import com.rockmusic.app.data.integration.SpotifyPlaylistReferenceParser
 import com.rockmusic.app.data.integration.YouTubeOfficialPlaybackProvider
 import com.rockmusic.app.domain.integration.IntegrationAvailability
 import com.rockmusic.app.domain.integration.IntegrationId
@@ -77,6 +80,7 @@ class IntegrationConnectionsViewModel @Inject constructor(
     private val registry: IntegrationRegistry,
     private val spotifyRequestFactory: SpotifyPkceRequestFactory,
     private val spotifyRequestStore: EncryptedSpotifyPkceRequestStore,
+    private val spotifyPlaylistClient: SpotifyPlaylistClient,
     private val youtubeProvider: YouTubeOfficialPlaybackProvider,
 ) : ViewModel() {
     private val _state = MutableStateFlow(IntegrationConnectionsState())
@@ -113,6 +117,10 @@ class IntegrationConnectionsViewModel @Inject constructor(
     fun reset(id: IntegrationId) = runExclusive {
         setBusy(id)
         registry.reset(id)
+        val clearSpotifyPreview = id == IntegrationId.SPOTIFY
+        if (clearSpotifyPreview) {
+            _state.value = _state.value.copy(spotifyPlaylist = null)
+        }
         loadSnapshots("${id.readableName()} configuration and authorization were removed.")
     }
 
@@ -130,6 +138,58 @@ class IntegrationConnectionsViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    fun updateSpotifyPlaylistReference(value: String) {
+        _state.value = _state.value.copy(
+            spotifyPlaylistReference = value,
+            spotifyPlaylist = null,
+            error = null,
+            message = null,
+        )
+    }
+
+    fun loadSpotifyPlaylist() = runExclusive {
+        val reference = _state.value.spotifyPlaylistReference
+        setBusy(IntegrationId.SPOTIFY)
+        spotifyPlaylistClient.load(reference)
+            .onSuccess { playlist ->
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    busyId = null,
+                    spotifyPlaylist = playlist,
+                    spotifyPlaylistReference = SpotifyPlaylistReferenceParser.canonicalWebUrl(playlist.id),
+                    message = "Loaded ${playlist.name} securely from Spotify.",
+                    error = null,
+                )
+            }
+            .onFailure { error ->
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    busyId = null,
+                    error = error.message ?: "Unable to load the Spotify playlist.",
+                )
+            }
+    }
+
+    fun openSpotifyPlaylist() = runExclusive {
+        setBusy(IntegrationId.SPOTIFY)
+        SpotifyPlaylistReferenceParser.parse(_state.value.spotifyPlaylistReference)
+            .onSuccess { playlistId ->
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    launchUri = SpotifyPlaylistReferenceParser.canonicalWebUrl(playlistId),
+                    message = "Opening the playlist through the official Spotify route.",
+                    error = null,
+                )
+            }
+            .onFailure { error ->
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    busyId = null,
+                    error = error.message ?: "The Spotify playlist link is invalid.",
+                )
+            }
     }
 
     fun launchConsumed(error: String? = null) {
@@ -206,23 +266,26 @@ class IntegrationConnectionsViewModel @Inject constructor(
     private suspend fun loadSnapshots(message: String? = null) {
         val busyId = _state.value.busyId
         _state.value = _state.value.copy(
-            isLoading = busyId == null,
+            isLoading = busyId == null && _state.value.items.isEmpty(),
             error = null,
         )
-        _state.value = runCatching { registry.snapshots() }
-            .fold(
-                onSuccess = {
-                    IntegrationConnectionsState(
-                        items = it,
-                        message = message,
-                    )
-                },
-                onFailure = {
-                    IntegrationConnectionsState(
-                        error = it.message ?: "Unable to read provider configuration",
-                    )
-                },
-            )
+        runCatching { registry.snapshots() }
+            .onSuccess { snapshots ->
+                _state.value = _state.value.copy(
+                    items = snapshots,
+                    isLoading = false,
+                    busyId = null,
+                    message = message,
+                    error = null,
+                )
+            }
+            .onFailure { error ->
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    busyId = null,
+                    error = error.message ?: "Unable to read provider configuration",
+                )
+            }
     }
 }
 
@@ -233,6 +296,8 @@ data class IntegrationConnectionsState(
     val launchUri: String? = null,
     val message: String? = null,
     val error: String? = null,
+    val spotifyPlaylistReference: String = DEFAULT_SPOTIFY_PLAYLIST_REFERENCE,
+    val spotifyPlaylist: SpotifyPlaylistPreview? = null,
 )
 
 @Composable
@@ -244,6 +309,10 @@ fun IntegrationConnectionsScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var editing by remember { mutableStateOf<IntegrationSnapshot?>(null) }
+    val spotifyAvailable = state.items.any { snapshot ->
+        snapshot.id == IntegrationId.SPOTIFY &&
+            snapshot.availability == IntegrationAvailability.Available
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -300,27 +369,29 @@ fun IntegrationConnectionsScreen(
             }
         }
 
-        when {
-            state.isLoading -> item { CircularProgressIndicator() }
-
-            state.error != null -> item {
+        state.error?.let { error ->
+            item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Text("Connections unavailable", fontWeight = FontWeight.Bold)
-                        Text(state.error.orEmpty())
-                        Button(onClick = viewModel::refresh) {
+                        Text("Connection action failed", fontWeight = FontWeight.Bold)
+                        Text(error)
+                        OutlinedButton(onClick = viewModel::refresh) {
                             Icon(Icons.Rounded.Refresh, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text("Retry")
+                            Text("Refresh status")
                         }
                     }
                 }
             }
+        }
 
-            else -> items(state.items, key = { it.id.name }) { snapshot ->
+        if (state.isLoading && state.items.isEmpty()) {
+            item { CircularProgressIndicator() }
+        } else {
+            items(state.items, key = { it.id.name }) { snapshot ->
                 IntegrationConnectionCard(
                     snapshot = snapshot,
                     isBusy = state.busyId == snapshot.id,
@@ -328,6 +399,19 @@ fun IntegrationConnectionsScreen(
                     onLock = { viewModel.lock(snapshot.id) },
                     onReset = { viewModel.reset(snapshot.id) },
                     onActivate = { viewModel.activate(snapshot.id) },
+                )
+            }
+        }
+
+        if (spotifyAvailable) {
+            item(key = "spotify-playlist-preview") {
+                SpotifyPlaylistPreviewCard(
+                    reference = state.spotifyPlaylistReference,
+                    preview = state.spotifyPlaylist,
+                    isBusy = state.busyId == IntegrationId.SPOTIFY,
+                    onReferenceChange = viewModel::updateSpotifyPlaylistReference,
+                    onLoad = viewModel::loadSpotifyPlaylist,
+                    onOpen = viewModel::openSpotifyPlaylist,
                 )
             }
         }
@@ -348,7 +432,7 @@ fun IntegrationConnectionsScreen(
             onDismiss = { editing = null },
             onUnlock = { values ->
                 editing = null
-                viewModel.unlock(snapshot.id, values)
+                viewModel.unlock(snapshot.id, values.filterValues(String::isNotBlank))
             },
         )
     }
@@ -491,7 +575,7 @@ private fun UnlockProviderDialog(
             }
         },
         confirmButton = {
-            Button(onClick = { onUnlock(values.toMap()) }) {
+            Button(onClick = { onUnlock(values.filterValues(String::isNotBlank)) }) {
                 Text("Unlock securely")
             }
         },
@@ -581,3 +665,6 @@ private fun IntegrationId.readableName(): String = name
     .lowercase()
     .split('_')
     .joinToString(" ") { it.replaceFirstChar(Char::titlecase) }
+
+private const val DEFAULT_SPOTIFY_PLAYLIST_REFERENCE =
+    "https://open.spotify.com/playlist/25Y5z4jvx8H5UHUFxSY95g"
