@@ -15,6 +15,23 @@ Rock Music is a premium native Android music platform built with Kotlin, Jetpack
 - Dark, light, AMOLED-ready, dynamic-colour, and Rock Red theme support
 - Pull-request CI for lint, unit tests, and debug APK assembly
 
+## How actions work
+
+Rock Music now uses a single source-aware policy engine for playback, downloads, sharing, recognition, official-provider handoff, and listening rooms.
+
+Every action identifies the media origin, resolves provider access and permissions, and receives one decision:
+
+- execute inside Rock Music;
+- open the official provider;
+- request configuration;
+- request authentication;
+- report offline;
+- block with a clear reason.
+
+The current local-library playback path already uses this policy. New provider integrations, download workers, Echo Find, and Listen Together must use the same boundary and may not call services directly from UI code.
+
+See [docs/OPERATING_MODEL.md](docs/OPERATING_MODEL.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ## Integration contract
 
 Rock Music will include all requested provider-backed options:
@@ -40,6 +57,8 @@ Rock Music does not bypass advertising, DRM, subscriptions, geographic restricti
 
 Offline storage is enabled only for local files, downloadable podcast enclosures, user-authorised cloud files, public-domain or appropriately licensed catalogues, and licensed provider content that explicitly grants download permission.
 
+Provider-controlled playback or offline access is handed to the official provider application rather than reconstructed inside Rock Music.
+
 See [docs/COMPLIANCE.md](docs/COMPLIANCE.md) for the complete policy.
 
 ## Build
@@ -54,9 +73,9 @@ The CI workflow installs Gradle automatically. A Gradle wrapper can be generated
 
 ## Delivery plan
 
-The native foundation is merged. Provider-backed services and the complete local/podcast/lyrics/download experiences remain tracked work and are not considered complete until their tests and fallback states pass.
+The native foundation and source-aware action policy are implemented. Provider-backed services and the complete local, podcast, lyrics, download, Echo Find, and Listen Together experiences remain tracked work and are not considered complete until their tests and fallback states pass.
 
-See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Licence
 
