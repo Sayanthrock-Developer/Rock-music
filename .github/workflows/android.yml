@@ -40,9 +40,16 @@ jobs:
           gradle-version: "8.11.1"
 
       - name: Lint, test, and assemble
+        id: gradle_verification
+        continue-on-error: true
+        shell: bash
         run: |
+          set +e
           set -o pipefail
           gradle --no-daemon :app:lintDebug :app:testDebugUnitTest :app:assembleDebug 2>&1 | tee gradle-verification.log
+          exit_code=${PIPESTATUS[0]}
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit "$exit_code"
 
       - name: Upload verification log
         if: always()
@@ -52,6 +59,12 @@ jobs:
           path: gradle-verification.log
           if-no-files-found: error
           retention-days: 7
+
+      - name: Fail when Gradle verification failed
+        if: steps.gradle_verification.outputs.exit_code != '0'
+        run: |
+          echo "Gradle verification failed with exit code ${{ steps.gradle_verification.outputs.exit_code }}"
+          exit 1
 
       - name: Upload debug APK
         if: success()
