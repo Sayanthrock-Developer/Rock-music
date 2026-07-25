@@ -43,6 +43,7 @@ class MainActivity : ComponentActivity() {
         externalPlayerSurface.value = intent?.getStringExtra(
             MediaSessionCommands.EXTRA_OPEN_PLAYER_SURFACE,
         )
+        intent?.removeExtra(MediaSessionCommands.EXTRA_OPEN_PLAYER_SURFACE)
         enableEdgeToEdge()
         setContent {
             val appearancePreferences = remember { AppearancePreferences(applicationContext) }
@@ -144,5 +145,6 @@ class MainActivity : ComponentActivity() {
         externalPlayerSurface.value = intent.getStringExtra(
             MediaSessionCommands.EXTRA_OPEN_PLAYER_SURFACE,
         )
+        intent.removeExtra(MediaSessionCommands.EXTRA_OPEN_PLAYER_SURFACE)
     }
 }
