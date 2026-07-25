@@ -16,6 +16,7 @@ import androidx.media3.session.MediaSession.ConnectionResult
 import androidx.media3.session.MediaSession.ConnectionResult.AcceptedResultBuilder
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionCommands
 import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
@@ -87,7 +88,7 @@ class MusicService : MediaSessionService() {
                     .add(MediaSessionCommands.openLyrics)
                     .build()
             } else {
-                ConnectionResult.DEFAULT_UNTRUSTED_SESSION_COMMANDS
+                SessionCommands.EMPTY
             }
             return AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(sessionCommands)
