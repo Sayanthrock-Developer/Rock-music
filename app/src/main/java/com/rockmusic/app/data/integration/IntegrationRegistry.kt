@@ -15,12 +15,16 @@ data class IntegrationSnapshot(
     val availability: IntegrationAvailability,
     val capabilities: ProviderCapabilities,
     val officialProviderOnly: Boolean,
+    val requiredConfiguration: List<ProviderConfigKey>,
+    val isUnlocked: Boolean,
+    val canUnlockWithoutInput: Boolean,
 )
 
 @Singleton
 class IntegrationRegistry @Inject constructor(
-    configuration: BuildConfigProviderConfigurationSource,
+    private val configuration: RuntimeProviderConfigurationSource,
 ) {
+    private val definitions = ProviderDefinitions.all.associateBy(IntegrationDefinition::id)
     private val gateways: Map<IntegrationId, ConfiguredProviderGateway> =
         ProviderDefinitions.all.associate { definition ->
             definition.id to ConfiguredProviderGateway(definition, configuration)
@@ -28,6 +32,15 @@ class IntegrationRegistry @Inject constructor(
 
     fun gateway(id: IntegrationId): IntegrationGateway =
         checkNotNull(gateways[id]) { "No gateway registered for $id" }
+
+    fun unlock(
+        id: IntegrationId,
+        suppliedValues: Map<ProviderConfigKey, String> = emptyMap(),
+    ): Result<Unit> = configuration.unlock(id, suppliedValues)
+
+    fun lock(id: IntegrationId) = configuration.lock(id)
+
+    fun reset(id: IntegrationId) = configuration.reset(id)
 
     suspend fun snapshots(): List<IntegrationSnapshot> =
         ProviderDefinitions.all.map { definition ->
@@ -38,17 +51,26 @@ class IntegrationRegistry @Inject constructor(
                 availability = gateway.availability(),
                 capabilities = gateway.capabilities(),
                 officialProviderOnly = definition.officialProviderOnly,
+                requiredConfiguration = definition.requiredConfiguration.sortedBy(ProviderConfigKey::name),
+                isUnlocked = configuration.isUnlocked(definition.id),
+                canUnlockWithoutInput = configuration.hasCompleteConfiguration(definition.id),
             )
         }
+
+    fun definition(id: IntegrationId): IntegrationDefinition =
+        checkNotNull(definitions[id]) { "No provider definition registered for $id" }
 }
 
 private class ConfiguredProviderGateway(
     private val definition: IntegrationDefinition,
-    private val configuration: ProviderConfigurationSource,
+    private val configuration: RuntimeProviderConfigurationSource,
 ) : IntegrationGateway {
     override val id: IntegrationId = definition.id
 
     override suspend fun availability(): IntegrationAvailability {
+        if (!configuration.isUnlocked(definition.id)) {
+            return IntegrationAvailability.Locked
+        }
         val missing = configuration.missing(definition.requiredConfiguration)
         return when {
             missing.isNotEmpty() -> IntegrationAvailability.Unconfigured(missing)
