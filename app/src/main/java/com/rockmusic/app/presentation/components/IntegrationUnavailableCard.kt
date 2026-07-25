@@ -55,6 +55,7 @@ fun IntegrationUnavailableCard(
 }
 
 private fun IntegrationAvailability.toUserMessage(): String = when (this) {
+    IntegrationAvailability.Locked -> "This option is locked. Open Connections to unlock it securely."
     IntegrationAvailability.Available -> "Available"
     is IntegrationAvailability.Unconfigured ->
         "Configuration required: ${missingKeys.sorted().joinToString()}"
