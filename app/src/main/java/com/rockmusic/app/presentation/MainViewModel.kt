@@ -44,8 +44,10 @@ class MainViewModel @Inject constructor(
                 .fold(
                     onSuccess = { scanned ->
                         val merged = mergeTracks(_libraryState.value.tracks, scanned)
-                        LocalLibraryState(
+                        _libraryState.value.copy(
                             tracks = merged,
+                            isLoading = false,
+                            error = null,
                             statusMessage = "Found ${scanned.size} songs on this phone.",
                         )
                     },
@@ -153,11 +155,17 @@ class MainViewModel @Inject constructor(
     }
 
     fun playAll(tracks: List<LocalTrack>) {
-        val approvedTracks = tracks.distinctBy(LocalTrack::mediaUri).filter { track ->
-            val decision = mediaActionPolicy.decide(track.toPlayRequest())
-            _lastActionDecision.value = decision
-            decision == MediaActionDecision.ExecuteInApp
-        }
+        val decisions = tracks.distinctBy(LocalTrack::mediaUri)
+            .map { track -> track to mediaActionPolicy.decide(track.toPlayRequest()) }
+
+        _lastActionDecision.value = decisions
+            .firstOrNull { (_, decision) -> decision != MediaActionDecision.ExecuteInApp }
+            ?.second
+            ?: decisions.firstOrNull()?.second
+
+        val approvedTracks = decisions
+            .filter { (_, decision) -> decision == MediaActionDecision.ExecuteInApp }
+            .map(Pair<LocalTrack, MediaActionDecision>::first)
 
         if (approvedTracks.isNotEmpty()) {
             playerConnection.playQueue(approvedTracks)
