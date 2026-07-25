@@ -23,8 +23,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.rockmusic.app.presentation.FolderManagerScreen
+import com.rockmusic.app.presentation.RockMusicExperience
 import com.rockmusic.app.presentation.SongManagerScreen
-import com.rockmusic.app.presentation.UnifiedMusicRoot
 import com.rockmusic.app.presentation.integrations.IntegrationConnectionsScreen
 import com.rockmusic.app.presentation.settings.AppearanceScreen
 import com.rockmusic.app.presentation.theme.AppearancePreferences
@@ -112,7 +112,7 @@ class MainActivity : ComponentActivity() {
                         )
 
                         else -> key(audioPermissionGranted) {
-                            UnifiedMusicRoot(
+                            RockMusicExperience(
                                 useBlurFrames = appearance.useBlurFrames,
                                 onOpenAppearance = { showAppearance = true },
                                 onOpenConnections = { showConnections = true },
