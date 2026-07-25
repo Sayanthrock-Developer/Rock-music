@@ -111,14 +111,16 @@ class IntegrationConnectionsViewModel @Inject constructor(
     fun lock(id: IntegrationId) = runExclusive {
         setBusy(id)
         registry.lock(id)
+        if (id == IntegrationId.SPOTIFY) {
+            _state.value = _state.value.copy(spotifyPlaylist = null)
+        }
         loadSnapshots("${id.readableName()} locked. Encrypted configuration was retained.")
     }
 
     fun reset(id: IntegrationId) = runExclusive {
         setBusy(id)
         registry.reset(id)
-        val clearSpotifyPreview = id == IntegrationId.SPOTIFY
-        if (clearSpotifyPreview) {
+        if (id == IntegrationId.SPOTIFY) {
             _state.value = _state.value.copy(spotifyPlaylist = null)
         }
         loadSnapshots("${id.readableName()} configuration and authorization were removed.")
@@ -271,12 +273,17 @@ class IntegrationConnectionsViewModel @Inject constructor(
         )
         runCatching { registry.snapshots() }
             .onSuccess { snapshots ->
+                val spotifyAvailable = snapshots.any { snapshot ->
+                    snapshot.id == IntegrationId.SPOTIFY &&
+                        snapshot.availability == IntegrationAvailability.Available
+                }
                 _state.value = _state.value.copy(
                     items = snapshots,
                     isLoading = false,
                     busyId = null,
                     message = message,
                     error = null,
+                    spotifyPlaylist = _state.value.spotifyPlaylist.takeIf { spotifyAvailable },
                 )
             }
             .onFailure { error ->
