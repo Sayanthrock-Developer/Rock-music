@@ -5,21 +5,27 @@ import android.content.Context
 import android.content.res.AssetFileDescriptor
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Log
 import com.rockmusic.app.domain.media.PlayableAudio
 import com.rockmusic.app.domain.model.LocalTrack
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import java.util.ArrayDeque
 import javax.inject.Inject
 import kotlin.math.abs
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 interface LocalMusicRepository {
     suspend fun scan(): List<LocalTrack>
 
     suspend fun resolve(uri: Uri): LocalTrack
+
+    suspend fun resolveAll(uris: List<Uri>): List<LocalTrack>
+
+    suspend fun scanFolder(treeUri: Uri): List<LocalTrack>
 }
 
 class MediaStoreLocalMusicRepository @Inject constructor(
@@ -167,8 +173,87 @@ class MediaStoreLocalMusicRepository @Inject constructor(
         }
     }
 
+    override suspend fun resolveAll(uris: List<Uri>): List<LocalTrack> = withContext(Dispatchers.IO) {
+        val uniqueUris = uris.distinctBy(Uri::toString)
+        val tracks = uniqueUris.mapNotNull { uri ->
+            runCatching { resolve(uri) }
+                .onFailure { error -> Log.w(TAG, "Skipping unreadable audio URI: $uri", error) }
+                .getOrNull()
+        }
+
+        require(tracks.isNotEmpty()) {
+            "No supported audio files could be opened."
+        }
+        tracks
+    }
+
+    override suspend fun scanFolder(treeUri: Uri): List<LocalTrack> = withContext(Dispatchers.IO) {
+        val resolver = context.contentResolver
+        val rootDocumentId = DocumentsContract.getTreeDocumentId(treeUri)
+        val pendingFolders = ArrayDeque<String>()
+        val visitedFolders = mutableSetOf<String>()
+        val audioUris = mutableListOf<Uri>()
+        pendingFolders.add(rootDocumentId)
+
+        while (pendingFolders.isNotEmpty() && audioUris.size < MAX_FOLDER_TRACKS) {
+            val parentDocumentId = pendingFolders.removeFirst()
+            if (!visitedFolders.add(parentDocumentId)) continue
+
+            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+                treeUri,
+                parentDocumentId,
+            )
+            resolver.query(
+                childrenUri,
+                arrayOf(
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                    DocumentsContract.Document.COLUMN_MIME_TYPE,
+                ),
+                null,
+                null,
+                null,
+            )?.use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                )
+                val nameColumn = cursor.getColumnIndexOrThrow(
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                )
+                val mimeColumn = cursor.getColumnIndexOrThrow(
+                    DocumentsContract.Document.COLUMN_MIME_TYPE,
+                )
+
+                while (cursor.moveToNext() && audioUris.size < MAX_FOLDER_TRACKS) {
+                    val documentId = cursor.getString(idColumn)
+                    val displayName = cursor.getString(nameColumn).orEmpty()
+                    val mimeType = cursor.getString(mimeColumn)
+
+                    if (mimeType == DocumentsContract.Document.MIME_TYPE_DIR) {
+                        pendingFolders.add(documentId)
+                    } else if (PlayableAudio.isSupported(mimeType, displayName)) {
+                        audioUris += DocumentsContract.buildDocumentUriUsingTree(
+                            treeUri,
+                            documentId,
+                        )
+                    }
+                }
+            }
+        }
+
+        require(audioUris.isNotEmpty()) {
+            "No supported audio files were found in the selected folder."
+        }
+
+        resolveAll(audioUris).sortedWith(
+            compareBy<LocalTrack> { it.album.lowercase() }
+                .thenBy { it.title.lowercase() },
+        )
+    }
+
     private companion object {
         const val TAG = "LocalMusicRepository"
         const val MIN_TRACK_DURATION_MS = 1_000L
+        const val MAX_FOLDER_TRACKS = 5_000
     }
 }
