@@ -5,11 +5,7 @@ import kotlinx.coroutines.flow.Flow
 
 sealed interface ProviderCallResult<out T> {
     data class Success<T>(val value: T) : ProviderCallResult<T>
-
-    data class Unavailable(
-        val availability: IntegrationAvailability,
-    ) : ProviderCallResult<Nothing>
-
+    data class Unavailable(val availability: IntegrationAvailability) : ProviderCallResult<Nothing>
     data class Failure(
         val message: String,
         val retryable: Boolean = true,
@@ -47,20 +43,10 @@ data class SpotifyTokenExchangeRequest(
 )
 
 interface SpotifyPkceService : IntegrationGateway {
-    fun createAuthorizationUri(
-        codeChallenge: String,
-        state: String,
-    ): ProviderCallResult<String>
-
-    suspend fun exchangeAuthorizationCode(
-        code: String,
-        codeVerifier: String,
-    ): ProviderCallResult<Unit>
-
-    suspend fun exchangeAuthorizationCode(
-        request: SpotifyTokenExchangeRequest,
-    ): ProviderCallResult<Unit> = exchangeAuthorizationCode(request.code, request.codeVerifier)
-
+    fun createAuthorizationUri(codeChallenge: String, state: String): ProviderCallResult<String>
+    suspend fun exchangeAuthorizationCode(code: String, codeVerifier: String): ProviderCallResult<Unit>
+    suspend fun exchangeAuthorizationCode(request: SpotifyTokenExchangeRequest): ProviderCallResult<Unit> =
+        exchangeAuthorizationCode(request.code, request.codeVerifier)
     suspend fun importPlaylist(playlistUrl: String): ProviderCallResult<PlaylistImportSummary>
 }
 
@@ -89,15 +75,9 @@ data class RecognitionMatch(
 )
 
 interface EchoFindProvider : IntegrationGateway {
-    suspend fun identify(
-        audioSample: ByteArray,
-        mimeType: String,
-    ): ProviderCallResult<RecognitionMatch>
-
-    suspend fun identify(
-        request: EchoFindRecognitionRequest,
-    ): ProviderCallResult<RecognitionMatch> = identify(request.audioSample, request.mimeType)
-
+    suspend fun identify(audioSample: ByteArray, mimeType: String): ProviderCallResult<RecognitionMatch>
+    suspend fun identify(request: EchoFindRecognitionRequest): ProviderCallResult<RecognitionMatch> =
+        identify(request.audioSample, request.mimeType)
     suspend fun deleteRecognitionHistory(): ProviderCallResult<Unit>
 }
 
@@ -193,13 +173,11 @@ data class DiscordActivity(
 )
 
 interface DiscordActivityProvider : IntegrationGateway {
-    suspend fun configure(
-        configuration: DiscordActivityConfiguration,
-    ): ProviderCallResult<Unit> = ProviderCallResult.Failure(
-        message = "Discord activity configuration is not implemented by this provider",
-        retryable = false,
-    )
-
+    suspend fun configure(configuration: DiscordActivityConfiguration): ProviderCallResult<Unit> =
+        ProviderCallResult.Failure(
+            message = "Discord activity configuration is not implemented by this provider",
+            retryable = false,
+        )
     suspend fun connect(): ProviderCallResult<Unit>
     suspend fun publish(activity: DiscordActivity): ProviderCallResult<Unit>
     suspend fun clear(): ProviderCallResult<Unit>
@@ -235,12 +213,9 @@ data class CataloguePlaybackGrant(
 
 interface LicensedCatalogueProvider : IntegrationGateway {
     suspend fun search(query: String, pageToken: String? = null): ProviderCallResult<CataloguePage>
-
     suspend fun search(request: CatalogueSearchRequest): ProviderCallResult<CataloguePage> =
         search(request.query, request.pageToken)
-
     suspend fun playbackAccess(providerId: String): ProviderCallResult<ProviderTrack>
-
     suspend fun playbackAccess(
         request: CataloguePlaybackRequest,
     ): ProviderCallResult<CataloguePlaybackGrant> = playbackAccess(request.providerId).mapValue { track ->
@@ -286,7 +261,6 @@ data class SynchronizedLyricsDocument(
 
 interface LyricsProvider : IntegrationGateway {
     suspend fun lyricsFor(track: ProviderTrack): ProviderCallResult<List<SynchronizedLyricLine>>
-
     suspend fun lyricsFor(request: LyricsRequest): ProviderCallResult<SynchronizedLyricsDocument> =
         lyricsFor(request.track).mapValue { lines ->
             SynchronizedLyricsDocument(
@@ -322,12 +296,10 @@ data class PodcastSearchPage(
 
 interface PodcastSearchProvider : IntegrationGateway {
     suspend fun searchPodcasts(query: String): ProviderCallResult<List<PodcastSearchItem>>
-
-    suspend fun searchPodcasts(
-        request: PodcastSearchRequest,
-    ): ProviderCallResult<PodcastSearchPage> = searchPodcasts(request.query).mapValue { items ->
-        PodcastSearchPage(items = items.take(request.pageSize.coerceIn(1, 100)))
-    }
+    suspend fun searchPodcasts(request: PodcastSearchRequest): ProviderCallResult<PodcastSearchPage> =
+        searchPodcasts(request.query).mapValue { items ->
+            PodcastSearchPage(items = items.take(request.pageSize.coerceIn(1, 100)))
+        }
 }
 
 data class DownloadItemRef(
@@ -336,7 +308,7 @@ data class DownloadItemRef(
     val accountId: String? = null,
 )
 
-data class DownloadPermission(
+data class DownloadGrantPermission(
     val permitted: Boolean,
     val reason: String? = null,
     val canRedownload: Boolean = false,
@@ -349,13 +321,13 @@ data class DownloadGrant(
     val expiresAtEpochMs: Long?,
     val expectedSha256: String? = null,
     val grantId: String = mediaId,
-    val providerId: String = "unknown",
+    val providerId: String = "",
     val issuedAtEpochMs: Long? = null,
     val notBeforeEpochMs: Long? = null,
     val mimeType: String? = null,
     val contentLengthBytes: Long? = null,
     val revalidationToken: String? = null,
-    val permission: DownloadPermission = DownloadPermission(permitted = false),
+    val permission: DownloadGrantPermission = DownloadGrantPermission(permitted = false),
 )
 
 data class DownloadGrantRequest(
@@ -393,7 +365,12 @@ object DownloadGrantValidator {
                 grant.permission.reason ?: "The provider did not permit this item for download",
             )
         }
-        if (grant.mediaId != item.mediaId || grant.providerId != item.providerId) {
+        if (
+            grant.providerId.isBlank() ||
+            item.providerId.isBlank() ||
+            grant.mediaId != item.mediaId ||
+            grant.providerId != item.providerId
+        ) {
             return DownloadGrantValidation.ItemMismatch
         }
         if (grant.notBeforeEpochMs?.let { nowEpochMs < it } == true) {
@@ -415,16 +392,11 @@ object DownloadGrantValidator {
 
 interface PermittedDownloadProvider : IntegrationGateway {
     suspend fun requestGrant(mediaId: String): ProviderCallResult<DownloadGrant>
-
-    suspend fun requestGrant(
-        request: DownloadGrantRequest,
-    ): ProviderCallResult<DownloadGrant> = requestGrant(request.item.mediaId)
-
+    suspend fun requestGrant(request: DownloadGrantRequest): ProviderCallResult<DownloadGrant> =
+        requestGrant(request.item.mediaId)
     suspend fun revalidate(grant: DownloadGrant): ProviderCallResult<DownloadGrant>
-
-    suspend fun revalidate(
-        request: DownloadGrantRevalidationRequest,
-    ): ProviderCallResult<DownloadGrant> = revalidate(request.grant)
+    suspend fun revalidate(request: DownloadGrantRevalidationRequest): ProviderCallResult<DownloadGrant> =
+        revalidate(request.grant)
 }
 
 data class CloudFile(
@@ -458,7 +430,6 @@ data class CloudPlaybackAccess(
 
 interface CloudStorageProvider : IntegrationGateway {
     fun createAuthorizationUri(state: String): ProviderCallResult<String>
-
     fun createAuthorizationRequest(
         state: String,
         redirectUri: String,
@@ -473,13 +444,10 @@ interface CloudStorageProvider : IntegrationGateway {
             expiresAtEpochMs = expiresAtEpochMs,
         )
     }
-
     suspend fun exchangeAuthorizationCode(code: String): ProviderCallResult<Unit>
     suspend fun listAudioFiles(pageToken: String? = null): ProviderCallResult<List<CloudFile>>
-
     suspend fun listAudioFilePage(pageToken: String? = null): ProviderCallResult<CloudFilePage> =
         listAudioFiles(pageToken).mapValue { CloudFilePage(it) }
-
     suspend fun playbackAccess(fileId: String): ProviderCallResult<ProviderTrack>
     suspend fun downloadGrant(fileId: String): ProviderCallResult<DownloadGrant>
 }
@@ -501,7 +469,6 @@ data class OfficialProviderRoute(
 interface OfficialPlaybackProvider : IntegrationGateway {
     fun openTrack(trackUri: String): ProviderCallResult<String>
     fun openSearch(query: String): ProviderCallResult<String>
-
     fun routeTrack(trackUri: String): ProviderCallResult<OfficialProviderRoute> =
         openTrack(trackUri).mapValue { uri ->
             OfficialProviderRoute(
@@ -511,7 +478,6 @@ interface OfficialPlaybackProvider : IntegrationGateway {
                 kind = OfficialRouteKind.VIDEO,
             )
         }
-
     fun routeSearch(query: String): ProviderCallResult<OfficialProviderRoute> =
         openSearch(query).mapValue { uri ->
             OfficialProviderRoute(
