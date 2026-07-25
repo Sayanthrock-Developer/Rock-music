@@ -33,57 +33,60 @@ class MainViewModel @Inject constructor(
     val lastActionDecision: StateFlow<MediaActionDecision?> = _lastActionDecision.asStateFlow()
 
     fun loadLocalMusic() {
-        if (_libraryState.value.isLoading) return
-        viewModelScope.launch {
-            _libraryState.value = _libraryState.value.copy(
-                isLoading = true,
-                error = null,
-                statusMessage = "Scanning songs on this phone…",
-            )
-            _libraryState.value = runCatching { localMusicRepository.scan() }
-                .fold(
-                    onSuccess = { scanned ->
-                        val merged = mergeTracks(_libraryState.value.tracks, scanned)
-                        _libraryState.value.copy(
-                            tracks = merged,
-                            isLoading = false,
-                            error = null,
-                            statusMessage = "Found ${scanned.size} songs on this phone.",
-                        )
-                    },
-                    onFailure = {
-                        _libraryState.value.copy(
-                            isLoading = false,
-                            error = it.message ?: "Unable to scan local music",
-                            statusMessage = null,
-                        )
-                    },
-                )
-        }
+        scanDeviceMusic(
+            loadingMessage = "Scanning songs on this phone…",
+            successMessage = { count -> "Found $count songs on this phone." },
+            autoPlay = false,
+        )
+    }
+
+    fun rescanDeviceLibrary() {
+        scanDeviceMusic(
+            loadingMessage = "Applying folder exclusions and rescanning…",
+            successMessage = { count -> "Library updated with $count included songs." },
+            autoPlay = false,
+        )
     }
 
     fun addAllSongs(autoPlay: Boolean = true) {
+        scanDeviceMusic(
+            loadingMessage = "Scanning and adding all included songs…",
+            successMessage = { count -> "Added $count included songs." },
+            autoPlay = autoPlay,
+        )
+    }
+
+    private fun scanDeviceMusic(
+        loadingMessage: String,
+        successMessage: (Int) -> String,
+        autoPlay: Boolean,
+    ) {
         if (_libraryState.value.isLoading || _libraryState.value.isImporting) return
         viewModelScope.launch {
             _libraryState.value = _libraryState.value.copy(
                 isLoading = true,
                 error = null,
-                statusMessage = "Scanning and adding all songs…",
+                statusMessage = loadingMessage,
             )
             runCatching { localMusicRepository.scan() }
                 .onSuccess { scanned ->
-                    _libraryState.value = _libraryState.value.copy(
-                        tracks = mergeTracks(_libraryState.value.tracks, scanned),
+                    val current = _libraryState.value
+                    val manuallyImported = current.tracks.filterNot { track ->
+                        track.mediaUri in current.deviceTrackUris
+                    }
+                    _libraryState.value = current.copy(
+                        tracks = mergeTracks(manuallyImported, scanned),
+                        deviceTrackUris = scanned.mapTo(mutableSetOf(), LocalTrack::mediaUri),
                         isLoading = false,
                         error = null,
-                        statusMessage = "Added ${scanned.size} songs.",
+                        statusMessage = successMessage(scanned.size),
                     )
                     if (autoPlay) playAll(scanned)
                 }
-                .onFailure {
+                .onFailure { error ->
                     _libraryState.value = _libraryState.value.copy(
                         isLoading = false,
-                        error = it.message ?: "Unable to add songs from this phone",
+                        error = error.message ?: "Unable to scan local music",
                         statusMessage = null,
                     )
                 }
@@ -193,6 +196,7 @@ class MainViewModel @Inject constructor(
 
 data class LocalLibraryState(
     val tracks: List<LocalTrack> = emptyList(),
+    val deviceTrackUris: Set<String> = emptySet(),
     val isLoading: Boolean = false,
     val isImporting: Boolean = false,
     val error: String? = null,

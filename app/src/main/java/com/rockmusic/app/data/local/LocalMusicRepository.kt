@@ -17,10 +17,13 @@ import javax.inject.Inject
 import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 interface LocalMusicRepository {
     suspend fun scan(): List<LocalTrack>
+
+    suspend fun folders(): List<LocalMusicFolder>
 
     suspend fun resolve(uri: Uri): LocalTrack
 
@@ -31,9 +34,11 @@ interface LocalMusicRepository {
 
 class MediaStoreLocalMusicRepository @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val folderExclusionStore: FolderExclusionStore,
 ) : LocalMusicRepository {
 
     override suspend fun scan(): List<LocalTrack> = withContext(Dispatchers.IO) {
+        val excludedFolderIds = folderExclusionStore.excludedFolderIds.first()
         val collection = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
@@ -46,6 +51,7 @@ class MediaStoreLocalMusicRepository @Inject constructor(
             MediaStore.Audio.Media.SIZE,
             MediaStore.Audio.Media.DISPLAY_NAME,
             MediaStore.Audio.Media.IS_MUSIC,
+            MediaStore.Audio.Media.RELATIVE_PATH,
         )
         val selection = "${MediaStore.Audio.Media.DURATION} >= ?"
         val selectionArgs = arrayOf(MIN_TRACK_DURATION_MS.toString())
@@ -68,12 +74,16 @@ class MediaStoreLocalMusicRepository @Inject constructor(
                 val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE)
                 val displayNameColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
                 val isMusicColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.IS_MUSIC)
+                val relativePathColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.RELATIVE_PATH)
 
                 while (cursor.moveToNext()) {
                     val mimeType = cursor.getString(mimeColumn)
                     val displayName = cursor.getString(displayNameColumn).orEmpty()
                     val isMusic = cursor.getInt(isMusicColumn) != 0
                     if (!isMusic && !PlayableAudio.isSupported(mimeType, displayName)) continue
+
+                    val relativePath = cursor.getString(relativePathColumn)
+                    if (LocalMusicFolderIdentity.id(relativePath) in excludedFolderIds) continue
 
                     val id = cursor.getLong(idColumn)
                     val albumId = cursor.getLong(albumIdColumn)
@@ -96,6 +106,60 @@ class MediaStoreLocalMusicRepository @Inject constructor(
                 }
             }
         }
+    }
+
+    override suspend fun folders(): List<LocalMusicFolder> = withContext(Dispatchers.IO) {
+        val projection = arrayOf(
+            MediaStore.Audio.Media.RELATIVE_PATH,
+            MediaStore.Audio.Media.DURATION,
+            MediaStore.Audio.Media.MIME_TYPE,
+            MediaStore.Audio.Media.SIZE,
+            MediaStore.Audio.Media.DISPLAY_NAME,
+            MediaStore.Audio.Media.IS_MUSIC,
+        )
+        val selection = "${MediaStore.Audio.Media.DURATION} >= ?"
+        val selectionArgs = arrayOf(MIN_TRACK_DURATION_MS.toString())
+        val folders = linkedMapOf<String, FolderAccumulator>()
+
+        context.contentResolver.query(
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+            projection,
+            selection,
+            selectionArgs,
+            "${MediaStore.Audio.Media.RELATIVE_PATH} ASC",
+        )?.use { cursor ->
+            val pathColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.RELATIVE_PATH)
+            val mimeColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.MIME_TYPE)
+            val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE)
+            val displayNameColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
+            val isMusicColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.IS_MUSIC)
+
+            while (cursor.moveToNext()) {
+                val mimeType = cursor.getString(mimeColumn)
+                val displayName = cursor.getString(displayNameColumn).orEmpty()
+                val isMusic = cursor.getInt(isMusicColumn) != 0
+                if (!isMusic && !PlayableAudio.isSupported(mimeType, displayName)) continue
+
+                val relativePath = cursor.getString(pathColumn)
+                val folderId = LocalMusicFolderIdentity.id(relativePath)
+                val accumulator = folders.getOrPut(folderId) {
+                    FolderAccumulator(
+                        id = folderId,
+                        displayPath = LocalMusicFolderIdentity.displayPath(relativePath),
+                        displayName = LocalMusicFolderIdentity.displayName(relativePath),
+                    )
+                }
+                accumulator.songCount += 1
+                accumulator.totalBytes += cursor.getLong(sizeColumn).coerceAtLeast(0L)
+            }
+        }
+
+        folders.values
+            .map(FolderAccumulator::toFolder)
+            .sortedWith(
+                compareBy<LocalMusicFolder> { it.displayName.lowercase() }
+                    .thenBy { it.displayPath.lowercase() },
+            )
     }
 
     override suspend fun resolve(uri: Uri): LocalTrack = withContext(Dispatchers.IO) {
@@ -265,6 +329,22 @@ class MediaStoreLocalMusicRepository @Inject constructor(
         tracks.sortedWith(
             compareBy<LocalTrack> { it.album.lowercase() }
                 .thenBy { it.title.lowercase() },
+        )
+    }
+
+    private data class FolderAccumulator(
+        val id: String,
+        val displayPath: String,
+        val displayName: String,
+        var songCount: Int = 0,
+        var totalBytes: Long = 0L,
+    ) {
+        fun toFolder() = LocalMusicFolder(
+            id = id,
+            displayPath = displayPath,
+            displayName = displayName,
+            songCount = songCount,
+            totalBytes = totalBytes,
         )
     }
 
