@@ -57,14 +57,33 @@ class OfficialProviderRouteLauncherTest {
     }
 
     @Test
-    fun `rejects non HTTPS web fallbacks`() {
-        val route = OfficialProviderRoute(
+    fun `rejects non HTTPS and non YouTube web fallbacks`() {
+        val insecure = OfficialProviderRoute(
             webUri = "http://music.youtube.com/search?q=rock",
             androidAppUri = null,
             preferredPackages = emptyList(),
             kind = OfficialRouteKind.SEARCH,
         )
+        val hostile = insecure.copy(webUri = "https://attacker.example/search?q=rock")
 
-        assertTrue(runCatching { OfficialRouteLaunchPlanner.targets(route) }.isFailure)
+        assertTrue(runCatching { OfficialRouteLaunchPlanner.targets(insecure) }.isFailure)
+        assertTrue(runCatching { OfficialRouteLaunchPlanner.targets(hostile) }.isFailure)
+    }
+
+    @Test
+    fun `rejects unsupported Android packages and malformed app ids`() {
+        val unsupportedPackage = OfficialProviderRoute(
+            webUri = "https://www.youtube.com/watch?v=abc123",
+            androidAppUri = "vnd.youtube:abc123",
+            preferredPackages = listOf("com.attacker.player"),
+            kind = OfficialRouteKind.VIDEO,
+        )
+        val malformedAppUri = unsupportedPackage.copy(
+            preferredPackages = listOf("com.google.android.youtube"),
+            androidAppUri = "vnd.youtube:not valid",
+        )
+
+        assertTrue(runCatching { OfficialRouteLaunchPlanner.targets(unsupportedPackage) }.isFailure)
+        assertTrue(runCatching { OfficialRouteLaunchPlanner.targets(malformedAppUri) }.isFailure)
     }
 }
