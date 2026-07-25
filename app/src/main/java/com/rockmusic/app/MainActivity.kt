@@ -5,11 +5,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.SmallFloatingActionButton
@@ -21,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.rockmusic.app.presentation.FolderManagerScreen
 import com.rockmusic.app.presentation.RockMusicRoot
 import com.rockmusic.app.presentation.SongManagerScreen
 import com.rockmusic.app.presentation.integrations.IntegrationConnectionsScreen
@@ -43,20 +47,28 @@ class MainActivity : ComponentActivity() {
             var showConnections by rememberSaveable { mutableStateOf(false) }
             var showAppearance by rememberSaveable { mutableStateOf(false) }
             var showSongManager by rememberSaveable { mutableStateOf(false) }
+            var showFolderManager by rememberSaveable { mutableStateOf(false) }
 
             RockMusicTheme(
                 mode = appearance.themeMode,
                 dynamicColor = appearance.useSystemColor,
                 rockRedAccent = !appearance.useSystemColor,
             ) {
-                BackHandler(enabled = showConnections || showAppearance || showSongManager) {
+                BackHandler(
+                    enabled = showConnections || showAppearance || showSongManager || showFolderManager,
+                ) {
                     showConnections = false
                     showAppearance = false
                     showSongManager = false
+                    showFolderManager = false
                 }
 
                 Box(Modifier.fillMaxSize()) {
                     when {
+                        showFolderManager -> FolderManagerScreen(
+                            onClose = { showFolderManager = false },
+                        )
+
                         showSongManager -> SongManagerScreen(
                             onClose = { showSongManager = false },
                         )
@@ -80,17 +92,29 @@ class MainActivity : ComponentActivity() {
                                 onOpenAppearance = { showAppearance = true },
                                 onOpenConnections = { showConnections = true },
                             )
-                            SmallFloatingActionButton(
-                                onClick = { showSongManager = true },
+                            Column(
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
                                     .statusBarsPadding()
                                     .padding(top = 8.dp, end = 14.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
-                                Icon(
-                                    Icons.Rounded.LibraryMusic,
-                                    contentDescription = "Open Song Manager",
-                                )
+                                SmallFloatingActionButton(
+                                    onClick = { showFolderManager = true },
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Folder,
+                                        contentDescription = "Open Folder Manager",
+                                    )
+                                }
+                                SmallFloatingActionButton(
+                                    onClick = { showSongManager = true },
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.LibraryMusic,
+                                        contentDescription = "Open Song Manager",
+                                    )
+                                }
                             }
                         }
                     }
