@@ -7,6 +7,12 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+fun String.asBuildConfigValue(): String =
+    "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
+fun org.gradle.api.provider.ProviderFactory.stringBuildConfig(name: String): String =
+    gradleProperty(name).orNull.orEmpty().asBuildConfigValue()
+
 android {
     namespace = "com.rockmusic.app"
     compileSdk = 36
@@ -20,6 +26,24 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+
+        buildConfigField("String", "ROCK_SPOTIFY_CLIENT_ID", providers.stringBuildConfig("ROCK_SPOTIFY_CLIENT_ID"))
+        buildConfigField("String", "ROCK_SPOTIFY_REDIRECT_URI", providers.stringBuildConfig("ROCK_SPOTIFY_REDIRECT_URI"))
+        buildConfigField("String", "ROCK_ECHO_FIND_BASE_URL", providers.stringBuildConfig("ROCK_ECHO_FIND_BASE_URL"))
+        buildConfigField("String", "ROCK_ECHO_FIND_API_KEY", providers.stringBuildConfig("ROCK_ECHO_FIND_API_KEY"))
+        buildConfigField("String", "ROCK_LISTEN_TOGETHER_REST_URL", providers.stringBuildConfig("ROCK_LISTEN_TOGETHER_REST_URL"))
+        buildConfigField("String", "ROCK_LISTEN_TOGETHER_WS_URL", providers.stringBuildConfig("ROCK_LISTEN_TOGETHER_WS_URL"))
+        buildConfigField("String", "ROCK_DISCORD_CLIENT_ID", providers.stringBuildConfig("ROCK_DISCORD_CLIENT_ID"))
+        buildConfigField("String", "ROCK_CATALOGUE_BASE_URL", providers.stringBuildConfig("ROCK_CATALOGUE_BASE_URL"))
+        buildConfigField("String", "ROCK_CATALOGUE_API_KEY", providers.stringBuildConfig("ROCK_CATALOGUE_API_KEY"))
+        buildConfigField("String", "ROCK_LYRICS_BASE_URL", providers.stringBuildConfig("ROCK_LYRICS_BASE_URL"))
+        buildConfigField("String", "ROCK_LYRICS_API_KEY", providers.stringBuildConfig("ROCK_LYRICS_API_KEY"))
+        buildConfigField("String", "ROCK_PODCAST_SEARCH_BASE_URL", providers.stringBuildConfig("ROCK_PODCAST_SEARCH_BASE_URL"))
+        buildConfigField("String", "ROCK_PODCAST_SEARCH_API_KEY", providers.stringBuildConfig("ROCK_PODCAST_SEARCH_API_KEY"))
+        buildConfigField("String", "ROCK_DOWNLOADS_BASE_URL", providers.stringBuildConfig("ROCK_DOWNLOADS_BASE_URL"))
+        buildConfigField("String", "ROCK_DOWNLOADS_API_KEY", providers.stringBuildConfig("ROCK_DOWNLOADS_API_KEY"))
+        buildConfigField("String", "ROCK_CLOUD_CLIENT_ID", providers.stringBuildConfig("ROCK_CLOUD_CLIENT_ID"))
+        buildConfigField("String", "ROCK_CLOUD_REDIRECT_URI", providers.stringBuildConfig("ROCK_CLOUD_REDIRECT_URI"))
     }
 
     buildTypes {
