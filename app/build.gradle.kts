@@ -1,9 +1,3 @@
-fun String.asBuildConfigValue(): String =
-    "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
-
-fun org.gradle.api.provider.ProviderFactory.stringBuildConfig(name: String): String =
-    gradleProperty(name).orNull.orEmpty().asBuildConfigValue()
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -12,6 +6,12 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
 }
+
+fun String.asBuildConfigValue(): String =
+    "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
+fun org.gradle.api.provider.ProviderFactory.stringBuildConfig(name: String): String =
+    gradleProperty(name).orNull.orEmpty().asBuildConfigValue()
 
 android {
     namespace = "com.rockmusic.app"
