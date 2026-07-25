@@ -12,11 +12,11 @@ class ProviderConfigurationValidatorTest {
         )
         ProviderConfigurationValidator.validate(
             ProviderConfigKey.SPOTIFY_REDIRECT_URI,
-            "https://music.example.com/oauth/spotify",
+            "rockmusic://oauth/spotify",
         )
         ProviderConfigurationValidator.validate(
-            ProviderConfigKey.SPOTIFY_REDIRECT_URI,
-            "rockmusic://oauth/spotify",
+            ProviderConfigKey.DISCORD_REDIRECT_URI,
+            "https://music.example.com/oauth/discord",
         )
         ProviderConfigurationValidator.validate(
             ProviderConfigKey.DISCORD_REDIRECT_URI,
@@ -37,7 +37,15 @@ class ProviderConfigurationValidatorTest {
     }
 
     @Test
-    fun `rejects insecure or mismatched redirect backend and websocket routes`() {
+    fun `rejects insecure unhandled or mismatched redirect backend and websocket routes`() {
+        assertTrue(
+            runCatching {
+                ProviderConfigurationValidator.validate(
+                    ProviderConfigKey.SPOTIFY_REDIRECT_URI,
+                    "https://music.example.com/oauth/spotify",
+                )
+            }.isFailure,
+        )
         assertTrue(
             runCatching {
                 ProviderConfigurationValidator.validate(
