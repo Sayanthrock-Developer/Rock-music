@@ -65,6 +65,10 @@ fun SongManagerScreen(
     val context = LocalContext.current
     val state by viewModel.libraryState.collectAsStateWithLifecycle()
     var selectedUris by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val allTrackUris = remember(state.tracks) {
+        state.tracks.mapTo(mutableSetOf(), LocalTrack::mediaUri)
+    }
+    val allSelected = allTrackUris.isNotEmpty() && selectedUris == allTrackUris
 
     val audioPermission = if (Build.VERSION.SDK_INT >= 33) {
         Manifest.permission.READ_MEDIA_AUDIO
@@ -120,9 +124,8 @@ fun SongManagerScreen(
         if (granted) viewModel.addAllSongs(autoPlay = true)
     }
 
-    LaunchedEffect(state.tracks) {
-        val availableUris = state.tracks.mapTo(mutableSetOf(), LocalTrack::mediaUri)
-        selectedUris = selectedUris.intersect(availableUris)
+    LaunchedEffect(allTrackUris) {
+        selectedUris = selectedUris.intersect(allTrackUris)
     }
 
     LazyColumn(
@@ -262,15 +265,11 @@ fun SongManagerScreen(
                 }
                 OutlinedButton(
                     onClick = {
-                        selectedUris = if (selectedUris.size == state.tracks.size) {
-                            emptySet()
-                        } else {
-                            state.tracks.mapTo(mutableSetOf(), LocalTrack::mediaUri)
-                        }
+                        selectedUris = if (allSelected) emptySet() else allTrackUris
                     },
-                    enabled = state.tracks.isNotEmpty(),
+                    enabled = allTrackUris.isNotEmpty(),
                 ) {
-                    Text(if (selectedUris.size == state.tracks.size) "Clear all" else "Select all")
+                    Text(if (allSelected) "Clear all" else "Select all")
                 }
             }
         }
@@ -355,7 +354,7 @@ fun SongManagerScreen(
                             },
                         )
                         Spacer(Modifier.width(8.dp))
-                        Column(modifier = Modifier.width(220.dp)) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 track.title,
                                 fontWeight = FontWeight.SemiBold,
