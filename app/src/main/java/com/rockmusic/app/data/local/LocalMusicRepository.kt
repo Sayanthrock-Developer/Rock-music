@@ -2,10 +2,12 @@ package com.rockmusic.app.data.local
 
 import android.content.ContentUris
 import android.content.Context
+import android.content.res.AssetFileDescriptor
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.MediaStore
 import android.provider.OpenableColumns
+import android.util.Log
 import com.rockmusic.app.domain.media.PlayableAudio
 import com.rockmusic.app.domain.model.LocalTrack
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -91,8 +93,21 @@ class MediaStoreLocalMusicRepository @Inject constructor(
 
     override suspend fun resolve(uri: Uri): LocalTrack = withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
+        val hasPersistedReadAccess = resolver.persistedUriPermissions.any { permission ->
+            permission.uri == uri && permission.isReadPermission
+        }
+        if (!hasPersistedReadAccess) {
+            Log.w(
+                TAG,
+                "Persistent read access was not granted for $uri; the file may need to be selected again after restart.",
+            )
+        }
+
         resolver.openAssetFileDescriptor(uri, "r")?.use { descriptor ->
-            require(descriptor.length != 0L) { "The selected audio file is empty." }
+            val length = descriptor.length
+            require(length == AssetFileDescriptor.UNKNOWN_LENGTH || length > 0L) {
+                "The selected audio file is empty."
+            }
         } ?: error("The selected audio file cannot be opened.")
 
         var displayName = "Downloaded audio"
@@ -153,6 +168,7 @@ class MediaStoreLocalMusicRepository @Inject constructor(
     }
 
     private companion object {
+        const val TAG = "LocalMusicRepository"
         const val MIN_TRACK_DURATION_MS = 1_000L
     }
 }
