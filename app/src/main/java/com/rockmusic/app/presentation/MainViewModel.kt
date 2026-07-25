@@ -1,5 +1,6 @@
 package com.rockmusic.app.presentation
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rockmusic.app.data.local.LocalMusicRepository
@@ -37,9 +38,43 @@ class MainViewModel @Inject constructor(
             _libraryState.value = _libraryState.value.copy(isLoading = true, error = null)
             _libraryState.value = runCatching { localMusicRepository.scan() }
                 .fold(
-                    onSuccess = { LocalLibraryState(tracks = it) },
-                    onFailure = { LocalLibraryState(error = it.message ?: "Unable to scan local music") },
+                    onSuccess = { scanned ->
+                        val selected = _libraryState.value.tracks.filter { it.id < 0L }
+                        LocalLibraryState(
+                            tracks = (selected + scanned).distinctBy(LocalTrack::mediaUri),
+                        )
+                    },
+                    onFailure = {
+                        _libraryState.value.copy(
+                            isLoading = false,
+                            error = it.message ?: "Unable to scan local music",
+                        )
+                    },
                 )
+        }
+    }
+
+    fun openDownloadedAudio(uri: Uri) {
+        if (_libraryState.value.isImporting) return
+        viewModelScope.launch {
+            _libraryState.value = _libraryState.value.copy(isImporting = true, error = null)
+            runCatching { localMusicRepository.resolve(uri) }
+                .onSuccess { track ->
+                    _libraryState.value = _libraryState.value.copy(
+                        tracks = listOf(track) + _libraryState.value.tracks.filterNot {
+                            it.mediaUri == track.mediaUri
+                        },
+                        isImporting = false,
+                        error = null,
+                    )
+                    play(track)
+                }
+                .onFailure {
+                    _libraryState.value = _libraryState.value.copy(
+                        isImporting = false,
+                        error = it.message ?: "Unable to open the downloaded audio file",
+                    )
+                }
         }
     }
 
@@ -63,10 +98,12 @@ class MainViewModel @Inject constructor(
     fun seekTo(positionMs: Long) = playerConnection.seekTo(positionMs)
     fun skipNext() = playerConnection.skipNext()
     fun skipPrevious() = playerConnection.skipPrevious()
+    fun clearPlayerError() = playerConnection.clearError()
 }
 
 data class LocalLibraryState(
     val tracks: List<LocalTrack> = emptyList(),
     val isLoading: Boolean = false,
+    val isImporting: Boolean = false,
     val error: String? = null,
 )
