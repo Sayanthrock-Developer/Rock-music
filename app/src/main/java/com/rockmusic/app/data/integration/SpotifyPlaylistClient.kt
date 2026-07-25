@@ -50,8 +50,15 @@ object SpotifyPlaylistReferenceParser {
         require(value.isNotBlank()) { "Enter a Spotify playlist link or URI." }
 
         val playlistId = when {
-            value.startsWith("spotify:playlist:", ignoreCase = true) ->
-                value.substringAfterLast(':')
+            value.startsWith("spotify:", ignoreCase = true) -> {
+                val parts = value.split(':')
+                require(
+                    parts.size == 3 &&
+                        parts[0].equals("spotify", ignoreCase = true) &&
+                        parts[1].equals("playlist", ignoreCase = true),
+                ) { "Enter an exact spotify:playlist: URI." }
+                parts[2]
+            }
 
             else -> {
                 val uri = URI(value)
@@ -61,9 +68,11 @@ object SpotifyPlaylistReferenceParser {
                 require(uri.host.equals("open.spotify.com", ignoreCase = true)) {
                     "Only open.spotify.com playlist links are supported."
                 }
-                require(uri.userInfo == null && uri.fragment == null) {
-                    "The Spotify playlist link is malformed."
-                }
+                require(
+                    uri.port == -1 &&
+                        uri.userInfo == null &&
+                        uri.fragment == null,
+                ) { "The Spotify playlist link is malformed." }
                 val segments = uri.path.orEmpty().split('/').filter(String::isNotBlank)
                 require(segments.size == 2 && segments[0].equals("playlist", ignoreCase = true)) {
                     "Enter a Spotify playlist link, not an album, artist, or track link."
@@ -117,18 +126,19 @@ class SpotifyPlaylistClient @Inject constructor(
 
     private suspend fun validAccessToken(nowEpochMs: Long = System.currentTimeMillis()): Result<String> =
         tokenMutex.withLock {
-            runCatching {
+            resultPreservingCancellation {
                 val token = readToken()
                     ?: error("Spotify is not authorised. Complete Spotify sign-in first.")
                 if (nowEpochMs + EXPIRY_SAFETY_WINDOW_MS < token.expiresAtEpochMs) {
-                    return@runCatching token.accessToken
+                    token.accessToken
+                } else {
+                    refreshTokenLocked(token).accessToken
                 }
-                refreshTokenLocked(token).accessToken
             }
         }
 
     private suspend fun refreshAccessToken(force: Boolean): Result<String> = tokenMutex.withLock {
-        runCatching {
+        resultPreservingCancellation {
             val token = readToken()
                 ?: error("Spotify is not authorised. Complete Spotify sign-in first.")
             if (!force && System.currentTimeMillis() + EXPIRY_SAFETY_WINDOW_MS < token.expiresAtEpochMs) {
@@ -228,7 +238,7 @@ class SpotifyPlaylistClient @Inject constructor(
     private fun SpotifyPlaylistResponse.toPreview(): SpotifyPlaylistPreview = SpotifyPlaylistPreview(
         id = id,
         name = name,
-        ownerName = owner.displayName.ifBlank { owner.id },
+        ownerName = owner.displayName.orEmpty().ifBlank { owner.id },
         description = description.orEmpty(),
         imageUrl = images.maxByOrNull { it.width ?: 0 }?.url,
         externalUrl = externalUrls.spotify.ifBlank {
@@ -255,6 +265,14 @@ class SpotifyPlaylistClient @Inject constructor(
             )
         },
     )
+
+    private inline fun <T> resultPreservingCancellation(block: () -> T): Result<T> = try {
+        Result.success(block())
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (error: Throwable) {
+        Result.failure(error)
+    }
 
     private companion object {
         const val API_BASE_URL = "https://api.spotify.com/v1"
@@ -299,7 +317,7 @@ private data class SpotifyPlaylistResponse(
 @Serializable
 private data class SpotifyOwner(
     val id: String,
-    @SerialName("display_name") val displayName: String = "",
+    @SerialName("display_name") val displayName: String? = null,
 )
 
 @Serializable
