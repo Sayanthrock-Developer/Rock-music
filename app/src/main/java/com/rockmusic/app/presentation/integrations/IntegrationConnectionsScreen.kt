@@ -32,6 +32,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -46,7 +47,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.rockmusic.app.data.integration.EncryptedSpotifyPkceRequestStore
@@ -65,6 +69,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 @HiltViewModel
 class IntegrationConnectionsViewModel @Inject constructor(
@@ -75,56 +81,53 @@ class IntegrationConnectionsViewModel @Inject constructor(
 ) : ViewModel() {
     private val _state = MutableStateFlow(IntegrationConnectionsState())
     val state: StateFlow<IntegrationConnectionsState> = _state.asStateFlow()
+    private val operationMutex = Mutex()
 
     init {
         refresh()
     }
 
-    fun refresh() {
-        viewModelScope.launch { loadSnapshots() }
+    fun refresh() = runExclusive {
+        loadSnapshots()
     }
 
-    fun unlock(id: IntegrationId, values: Map<ProviderConfigKey, String>) {
-        viewModelScope.launch {
-            _state.value = _state.value.copy(busyId = id, error = null, message = null)
-            registry.unlock(id, values)
-                .onSuccess { loadSnapshots("${id.readableName()} unlocked securely.") }
-                .onFailure { error ->
-                    _state.value = _state.value.copy(
-                        busyId = null,
-                        error = error.message ?: "Unable to unlock this provider.",
-                    )
-                }
-        }
+    fun unlock(id: IntegrationId, values: Map<ProviderConfigKey, String>) = runExclusive {
+        setBusy(id)
+        registry.unlock(id, values)
+            .onSuccess { loadSnapshots("${id.readableName()} unlocked securely.") }
+            .onFailure { error ->
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    busyId = null,
+                    error = error.message ?: "Unable to unlock this provider.",
+                )
+            }
     }
 
-    fun lock(id: IntegrationId) {
-        viewModelScope.launch {
-            registry.lock(id)
-            loadSnapshots("${id.readableName()} locked. Encrypted configuration was retained.")
-        }
+    fun lock(id: IntegrationId) = runExclusive {
+        setBusy(id)
+        registry.lock(id)
+        loadSnapshots("${id.readableName()} locked. Encrypted configuration was retained.")
     }
 
-    fun reset(id: IntegrationId) {
-        viewModelScope.launch {
-            registry.reset(id)
-            loadSnapshots("${id.readableName()} configuration was removed.")
-        }
+    fun reset(id: IntegrationId) = runExclusive {
+        setBusy(id)
+        registry.reset(id)
+        loadSnapshots("${id.readableName()} configuration and authorization were removed.")
     }
 
-    fun activate(id: IntegrationId) {
-        viewModelScope.launch {
-            _state.value = _state.value.copy(busyId = id, error = null, message = null)
-            when (id) {
-                IntegrationId.SPOTIFY -> prepareSpotifyAuthorization()
-                IntegrationId.OFFICIAL_YOUTUBE -> prepareYouTubeSearch()
-                else -> {
-                    val availability = registry.gateway(id).availability()
-                    _state.value = _state.value.copy(
-                        busyId = null,
-                        message = availability.activationMessage(id),
-                    )
-                }
+    fun activate(id: IntegrationId) = runExclusive {
+        setBusy(id)
+        when (id) {
+            IntegrationId.SPOTIFY -> prepareSpotifyAuthorization()
+            IntegrationId.OFFICIAL_YOUTUBE -> prepareYouTubeSearch()
+            else -> {
+                val availability = registry.gateway(id).availability()
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    busyId = null,
+                    message = availability.activationMessage(id),
+                )
             }
         }
     }
@@ -137,6 +140,21 @@ class IntegrationConnectionsViewModel @Inject constructor(
         )
     }
 
+    private fun runExclusive(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            operationMutex.withLock { block() }
+        }
+    }
+
+    private fun setBusy(id: IntegrationId) {
+        _state.value = _state.value.copy(
+            isLoading = false,
+            busyId = id,
+            error = null,
+            message = null,
+        )
+    }
+
     private suspend fun prepareSpotifyAuthorization() {
         spotifyRequestStore.clearExpired(System.currentTimeMillis())
         spotifyRequestFactory.create(
@@ -144,11 +162,13 @@ class IntegrationConnectionsViewModel @Inject constructor(
         ).onSuccess { request ->
             spotifyRequestStore.save(request)
             _state.value = _state.value.copy(
+                isLoading = false,
                 launchUri = request.authorizationUri,
                 message = "A fresh Spotify PKCE request was generated and encrypted on this device.",
             )
         }.onFailure { error ->
             _state.value = _state.value.copy(
+                isLoading = false,
                 busyId = null,
                 error = error.message ?: "Unable to create the Spotify authorization request.",
             )
@@ -159,17 +179,23 @@ class IntegrationConnectionsViewModel @Inject constructor(
         when (val route = youtubeProvider.routeSearch("Rock Music")) {
             is ProviderCallResult.Success -> {
                 _state.value = _state.value.copy(
+                    isLoading = false,
                     launchUri = route.value.webUri,
                     message = "Opening the validated official YouTube Music search route.",
                 )
             }
 
             is ProviderCallResult.Failure -> {
-                _state.value = _state.value.copy(busyId = null, error = route.message)
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    busyId = null,
+                    error = route.message,
+                )
             }
 
             is ProviderCallResult.Unavailable -> {
                 _state.value = _state.value.copy(
+                    isLoading = false,
                     busyId = null,
                     error = route.availability.activationMessage(IntegrationId.OFFICIAL_YOUTUBE),
                 )
@@ -178,7 +204,11 @@ class IntegrationConnectionsViewModel @Inject constructor(
     }
 
     private suspend fun loadSnapshots(message: String? = null) {
-        _state.value = _state.value.copy(isLoading = true, error = null, busyId = null)
+        val busyId = _state.value.busyId
+        _state.value = _state.value.copy(
+            isLoading = busyId == null,
+            error = null,
+        )
         _state.value = runCatching { registry.snapshots() }
             .fold(
                 onSuccess = {
@@ -212,7 +242,16 @@ fun IntegrationConnectionsScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var editing by remember { mutableStateOf<IntegrationSnapshot?>(null) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     LaunchedEffect(state.launchUri) {
         val uri = state.launchUri ?: return@LaunchedEffect
@@ -296,7 +335,7 @@ fun IntegrationConnectionsScreen(
         item {
             HorizontalDivider()
             Text(
-                text = "Only public mobile client IDs, registered HTTPS redirect URIs, publishable or Android-restricted keys, and licensed service URLs may be entered. OAuth client secrets, signing secrets, unrestricted keys, and privileged backend credentials must never be placed in the app.",
+                text = "Only public mobile client IDs, registered HTTPS app links or exact Rock Music callback routes, publishable or Android-restricted keys, and licensed service URLs may be entered. OAuth client secrets, signing secrets, unrestricted keys, and privileged backend credentials must never be placed in the app.",
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 12.dp),
             )
@@ -380,7 +419,13 @@ private fun IntegrationConnectionCard(
                     snapshot.id == IntegrationId.SPOTIFY -> Button(onClick = onActivate) {
                         Icon(Icons.Rounded.OpenInNew, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text("Authorise")
+                        Text(
+                            if (snapshot.availability == IntegrationAvailability.Available) {
+                                "Re-authorise"
+                            } else {
+                                "Authorise"
+                            },
+                        )
                     }
 
                     snapshot.id == IntegrationId.OFFICIAL_YOUTUBE -> Button(onClick = onActivate) {
@@ -395,9 +440,9 @@ private fun IntegrationConnectionCard(
                 }
 
                 if (snapshot.isUnlocked && snapshot.id != IntegrationId.OFFICIAL_YOUTUBE) {
-                    TextButton(onClick = onLock) { Text("Lock") }
+                    TextButton(onClick = onLock, enabled = !isBusy) { Text("Lock") }
                     if (snapshot.requiredConfiguration.isNotEmpty()) {
-                        TextButton(onClick = onReset) { Text("Reset") }
+                        TextButton(onClick = onReset, enabled = !isBusy) { Text("Reset") }
                     }
                 }
             }
@@ -461,7 +506,7 @@ private fun IntegrationAvailability.toStatusText(): Pair<String, String> = when 
         "Locked" to "Unlock this provider before Rock Music exposes its configured capability."
 
     IntegrationAvailability.Available ->
-        "Available" to "Configuration and capability checks passed."
+        "Available" to "Configuration, authorization, and capability checks passed."
 
     is IntegrationAvailability.Unconfigured ->
         "Setup required" to "Missing: ${missingKeys.sorted().joinToString()}"
@@ -481,7 +526,7 @@ private fun IntegrationAvailability.toStatusText(): Pair<String, String> = when 
 
 private fun IntegrationAvailability.activationMessage(id: IntegrationId): String = when (this) {
     IntegrationAvailability.Locked -> "${id.readableName()} is locked."
-    IntegrationAvailability.Available -> "${id.readableName()} is unlocked and its provider contract is ready."
+    IntegrationAvailability.Available -> "${id.readableName()} is unlocked and authorised."
     is IntegrationAvailability.Unconfigured -> "Missing: ${missingKeys.sorted().joinToString()}"
     IntegrationAvailability.AuthenticationRequired -> "${id.readableName()} still requires user authorisation."
     IntegrationAvailability.Offline -> "${id.readableName()} is unavailable while offline."
@@ -511,11 +556,22 @@ private fun ProviderConfigKey.readableLabel(): String = propertyName
     .split('_')
     .joinToString(" ") { it.replaceFirstChar(Char::titlecase) }
 
-private fun ProviderConfigKey.inputHint(): String = when {
-    name.endsWith("_WS_URL") -> "Secure wss:// endpoint"
-    name.endsWith("_URL") || name.endsWith("_URI") -> "Registered secure https:// address"
-    name.endsWith("_API_KEY") -> "Publishable or Android-restricted key only"
-    else -> "Public application identifier"
+private fun ProviderConfigKey.inputHint(): String = when (this) {
+    ProviderConfigKey.SPOTIFY_REDIRECT_URI ->
+        "Registered HTTPS app link or rockmusic://oauth/spotify"
+
+    ProviderConfigKey.DISCORD_REDIRECT_URI ->
+        "Registered HTTPS app link or rockmusic://oauth/discord"
+
+    ProviderConfigKey.CLOUD_REDIRECT_URI ->
+        "Registered HTTPS app link or rockmusic://oauth/cloud"
+
+    else -> when {
+        name.endsWith("_WS_URL") -> "Secure wss:// endpoint"
+        name.endsWith("_URL") || name.endsWith("_URI") -> "Registered secure https:// address"
+        name.endsWith("_API_KEY") -> "Publishable or Android-restricted key only"
+        else -> "Public application identifier"
+    }
 }
 
 private fun ProviderConfigKey.isSensitiveInput(): Boolean =
