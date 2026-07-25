@@ -21,10 +21,14 @@ object LocalMusicFolderIdentity {
     fun displayPath(relativePath: String?): String =
         normalizePath(relativePath).ifBlank { "Internal storage" }
 
-    fun displayName(relativePath: String?): String =
-        normalizePath(relativePath)
-            .substringAfterLast('/', missingDelimiterValue = "")
-            .ifBlank { "Internal storage" }
+    fun displayName(relativePath: String?): String {
+        val normalized = normalizePath(relativePath)
+        return if (normalized.isBlank()) {
+            "Internal storage"
+        } else {
+            normalized.substringAfterLast('/')
+        }
+    }
 
     private fun normalizePath(relativePath: String?): String = relativePath
         .orEmpty()
