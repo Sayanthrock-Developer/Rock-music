@@ -64,22 +64,25 @@ class EmbeddedLyricsRepository @Inject constructor(
         val filesUri = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
         val selection =
             "${MediaStore.MediaColumns.RELATIVE_PATH}=? AND " +
-                "${MediaStore.MediaColumns.DISPLAY_NAME} IN (?, ?)"
-        val arguments = arrayOf(metadata.second, names[0], names[1])
+                "${MediaStore.MediaColumns.DISPLAY_NAME}=?"
 
-        return context.contentResolver.query(
-            filesUri,
-            arrayOf(MediaStore.MediaColumns._ID),
-            selection,
-            arguments,
-            null,
-        )?.use { cursor ->
-            if (!cursor.moveToFirst()) return@use null
-            val sidecarUri = ContentUris.withAppendedId(filesUri, cursor.getLong(0))
-            context.contentResolver.openInputStream(sidecarUri)
-                ?.bufferedReader(Charsets.UTF_8)
-                ?.use(::readLimitedText)
-        }
+        return names.asSequence()
+            .mapNotNull { name ->
+                context.contentResolver.query(
+                    filesUri,
+                    arrayOf(MediaStore.MediaColumns._ID),
+                    selection,
+                    arrayOf(metadata.second, name),
+                    null,
+                )?.use { cursor ->
+                    if (!cursor.moveToFirst()) return@use null
+                    val sidecarUri = ContentUris.withAppendedId(filesUri, cursor.getLong(0))
+                    context.contentResolver.openInputStream(sidecarUri)
+                        ?.bufferedReader(Charsets.UTF_8)
+                        ?.use(::readLimitedText)
+                }
+            }
+            .firstOrNull()
     }
 
     private fun sidecarNames(baseName: String): List<String> = listOf(
