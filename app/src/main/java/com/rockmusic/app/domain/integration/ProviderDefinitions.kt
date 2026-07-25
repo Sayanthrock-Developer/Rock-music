@@ -48,7 +48,11 @@ object ProviderDefinitions {
         IntegrationDefinition(
             id = IntegrationId.DISCORD,
             displayName = "Discord activity",
-            requiredConfiguration = setOf(ProviderConfigKey.DISCORD_CLIENT_ID),
+            requiredConfiguration = setOf(
+                ProviderConfigKey.DISCORD_CLIENT_ID,
+                ProviderConfigKey.DISCORD_REDIRECT_URI,
+                ProviderConfigKey.DISCORD_ACTIVITY_BACKEND_URL,
+            ),
             capabilities = ProviderCapabilities(canShareActivity = true),
             requiresUserAuthentication = true,
         ),
@@ -111,7 +115,10 @@ object ProviderDefinitions {
             id = IntegrationId.OFFICIAL_YOUTUBE,
             displayName = "YouTube / YouTube Music",
             requiredConfiguration = emptySet(),
-            capabilities = ProviderCapabilities(canOpenOfficialPlayback = true),
+            capabilities = ProviderCapabilities(
+                canSearch = true,
+                canOpenOfficialPlayback = true,
+            ),
             officialProviderOnly = true,
         ),
     )
