@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.rockmusic.app.data.integration.SpotifyPlaylistPreview
 import com.rockmusic.app.data.integration.SpotifyPlaylistTrackPreview
+import java.util.Locale
 
 @Composable
 internal fun SpotifyPlaylistPreviewCard(
@@ -211,7 +212,7 @@ private fun formatDuration(durationMs: Long): String {
     val totalSeconds = durationMs.coerceAtLeast(0L) / 1_000L
     val minutes = totalSeconds / 60L
     val seconds = totalSeconds % 60L
-    return "%d:%02d".format(minutes, seconds)
+    return String.format(Locale.ROOT, "%d:%02d", minutes, seconds)
 }
 
 private const val PREVIEW_TRACK_LIMIT = 5
