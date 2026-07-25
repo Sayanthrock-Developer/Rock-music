@@ -5,11 +5,13 @@ import com.rockmusic.app.domain.integration.IntegrationId
 import com.rockmusic.app.security.TokenVault
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
@@ -27,10 +29,10 @@ class SpotifyAuthorizationCallbackHandler @Inject constructor(
             uri?.host.equals(CALLBACK_HOST, ignoreCase = true) &&
             uri?.path == CALLBACK_PATH
 
-    suspend fun handle(callbackUri: String): Result<String> = runCatching {
+    suspend fun handle(callbackUri: String): Result<String> = try {
         val pending = requestStore.current()
             ?: error("No pending Spotify authorization request was found.")
-        when (
+        val message = when (
             val callback = requestFactory.validateCallback(
                 callbackUri = callbackUri,
                 pendingRequest = pending,
@@ -38,7 +40,7 @@ class SpotifyAuthorizationCallbackHandler @Inject constructor(
         ) {
             is SpotifyAuthorizationCallbackResult.Authorized -> {
                 val consumed = requestStore.consume(callback.request.state)
-                    ?: error("The Spotify authorization request was already consumed or replaced.")
+                    ?: error("The Spotify authorization request expired, was consumed, or was replaced.")
                 tokenClient.exchange(
                     code = callback.authorizationCode,
                     request = consumed,
@@ -57,6 +59,11 @@ class SpotifyAuthorizationCallbackHandler @Inject constructor(
 
             is SpotifyAuthorizationCallbackResult.Rejected -> error(callback.reason)
         }
+        Result.success(message)
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (error: Throwable) {
+        Result.failure(error)
     }
 
     private companion object {
@@ -82,7 +89,7 @@ class SpotifyPkceTokenClient @Inject constructor(
         request: SpotifyPkceRequest,
         nowEpochMs: Long = System.currentTimeMillis(),
     ): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
+        try {
             val clientId = configuration.value(ProviderConfigKey.SPOTIFY_CLIENT_ID)
             require(clientId.isNotBlank()) { "Spotify client ID is not configured." }
             require(code.isNotBlank()) { "Spotify authorization code is empty." }
@@ -112,25 +119,29 @@ class SpotifyPkceTokenClient @Inject constructor(
                 require(token.accessToken.isNotBlank() && token.expiresInSeconds > 0L) {
                     "Spotify returned an invalid token response."
                 }
-                vault.put(KEY_ACCESS_TOKEN, token.accessToken)
-                token.refreshToken?.takeIf(String::isNotBlank)?.let {
-                    vault.put(KEY_REFRESH_TOKEN, it)
-                }
-                vault.put(KEY_SCOPE, token.scope.orEmpty())
                 vault.put(
-                    KEY_EXPIRES_AT,
-                    (nowEpochMs + token.expiresInSeconds * 1_000L).toString(),
+                    KEY_TOKEN,
+                    json.encodeToString(
+                        SpotifyTokenEnvelope(
+                            accessToken = token.accessToken,
+                            refreshToken = token.refreshToken,
+                            scope = token.scope.orEmpty(),
+                            expiresAtEpochMs = nowEpochMs + token.expiresInSeconds * 1_000L,
+                        ),
+                    ),
                 )
             }
+            Result.success(Unit)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Throwable) {
+            Result.failure(error)
         }
     }
 
     private companion object {
         const val TOKEN_ENDPOINT = "https://accounts.spotify.com/api/token"
-        const val KEY_ACCESS_TOKEN = "spotify.oauth.access_token"
-        const val KEY_REFRESH_TOKEN = "spotify.oauth.refresh_token"
-        const val KEY_SCOPE = "spotify.oauth.scope"
-        const val KEY_EXPIRES_AT = "spotify.oauth.expires_at"
+        const val KEY_TOKEN = "spotify.oauth.token"
     }
 }
 
@@ -141,4 +152,12 @@ private data class SpotifyTokenResponse(
     @SerialName("expires_in") val expiresInSeconds: Long,
     @SerialName("refresh_token") val refreshToken: String? = null,
     val scope: String? = null,
+)
+
+@Serializable
+private data class SpotifyTokenEnvelope(
+    val accessToken: String,
+    val refreshToken: String? = null,
+    val scope: String,
+    val expiresAtEpochMs: Long,
 )
