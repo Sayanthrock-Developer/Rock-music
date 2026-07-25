@@ -1,0 +1,30 @@
+{
+  "name": "Rock Music Sayanth",
+  "url": "https://github.com/Sayanthrock-Developer/Rock-music",
+  "description": "Read-only GitHub integration for Rock Music releases, workflow status, pull requests, and repository metadata.",
+  "public": false,
+  "redirect_url": "https://rock-music.example.invalid/github/callback",
+  "callback_urls": [
+    "https://rock-music.example.invalid/github/callback"
+  ],
+  "setup_url": "https://rock-music.example.invalid/github/setup",
+  "setup_on_update": true,
+  "hook_attributes": {
+    "url": "https://rock-music.example.invalid/github/webhook",
+    "active": true
+  },
+  "default_permissions": {
+    "actions": "read",
+    "checks": "read",
+    "contents": "read",
+    "issues": "read",
+    "metadata": "read",
+    "pull_requests": "read"
+  },
+  "default_events": [
+    "check_run",
+    "pull_request",
+    "release",
+    "workflow_run"
+  ]
+}
