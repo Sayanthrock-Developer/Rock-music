@@ -6,6 +6,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.MediaStore
 import android.provider.OpenableColumns
+import com.rockmusic.app.domain.media.PlayableAudio
 import com.rockmusic.app.domain.model.LocalTrack
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -63,7 +64,7 @@ class MediaStoreLocalMusicRepository @Inject constructor(
                     val mimeType = cursor.getString(mimeColumn)
                     val displayName = cursor.getString(displayNameColumn).orEmpty()
                     val isMusic = cursor.getInt(isMusicColumn) != 0
-                    if (!isMusic && !isPlayableAudio(mimeType, displayName)) continue
+                    if (!isMusic && !PlayableAudio.isSupported(mimeType, displayName)) continue
 
                     val id = cursor.getLong(idColumn)
                     val albumId = cursor.getLong(albumIdColumn)
@@ -112,7 +113,7 @@ class MediaStoreLocalMusicRepository @Inject constructor(
         }
 
         val mimeType = resolver.getType(uri)
-        require(isPlayableAudio(mimeType, displayName)) {
+        require(PlayableAudio.isSupported(mimeType, displayName)) {
             "The selected file is not a supported audio file."
         }
 
@@ -151,22 +152,7 @@ class MediaStoreLocalMusicRepository @Inject constructor(
         }
     }
 
-    private fun isPlayableAudio(mimeType: String?, displayName: String): Boolean =
-        mimeType?.startsWith("audio/", ignoreCase = true) == true ||
-            SUPPORTED_EXTENSIONS.any { displayName.endsWith(it, ignoreCase = true) }
-
     private companion object {
         const val MIN_TRACK_DURATION_MS = 1_000L
-        val SUPPORTED_EXTENSIONS = setOf(
-            ".mp3",
-            ".m4a",
-            ".aac",
-            ".flac",
-            ".ogg",
-            ".opus",
-            ".wav",
-            ".amr",
-            ".3gp",
-        )
     }
 }
