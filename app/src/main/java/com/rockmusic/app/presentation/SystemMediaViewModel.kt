@@ -103,10 +103,20 @@ class SystemMediaViewModel @Inject constructor(
     fun selectAudioRoute(index: Int) {
         routeController.select(index)
             .onSuccess {
-                _routeState.value = AudioRouteUiState(
-                    routes = routeController.routes(),
-                    message = "Audio output changed.",
-                )
+                _routeState.value = runCatching { routeController.routes() }
+                    .fold(
+                        onSuccess = { routes ->
+                            AudioRouteUiState(
+                                routes = routes,
+                                message = "Audio output changed.",
+                            )
+                        },
+                        onFailure = { error ->
+                            AudioRouteUiState(
+                                error = error.message ?: "Audio changed, but outputs could not be refreshed.",
+                            )
+                        },
+                    )
             }
             .onFailure { error ->
                 _routeState.value = _routeState.value.copy(
