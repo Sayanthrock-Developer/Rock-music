@@ -100,7 +100,12 @@ object ProviderConfigurationValidator {
             }
 
             ProviderConfigKey.SPOTIFY_REDIRECT_URI ->
-                validateRedirectUri(key, value, expectedPrivatePath = "/spotify")
+                validateRedirectUri(
+                    key = key,
+                    value = value,
+                    expectedPrivatePath = "/spotify",
+                    allowHttpsAppLink = false,
+                )
 
             ProviderConfigKey.DISCORD_REDIRECT_URI ->
                 validateRedirectUri(key, value, expectedPrivatePath = "/discord")
@@ -135,13 +140,15 @@ object ProviderConfigurationValidator {
         key: ProviderConfigKey,
         value: String,
         expectedPrivatePath: String,
+        allowHttpsAppLink: Boolean = true,
     ) {
         val uri = runCatching { URI(value) }.getOrNull()
         val clean = uri != null &&
             uri.userInfo == null &&
             uri.query == null &&
             uri.fragment == null
-        val isHttpsAppLink = clean &&
+        val isHttpsAppLink = allowHttpsAppLink &&
+            clean &&
             uri?.scheme?.equals("https", ignoreCase = true) == true &&
             !uri.host.isNullOrBlank() &&
             uri.port == -1
@@ -151,7 +158,11 @@ object ProviderConfigurationValidator {
             uri.path == expectedPrivatePath &&
             uri.port == -1
         require(isHttpsAppLink || isRegisteredPrivateCallback) {
-            "${key.propertyName} must use a clean HTTPS app link or the registered rockmusic://oauth$expectedPrivatePath callback"
+            if (allowHttpsAppLink) {
+                "${key.propertyName} must use a clean HTTPS app link or the registered rockmusic://oauth$expectedPrivatePath callback"
+            } else {
+                "${key.propertyName} must exactly match rockmusic://oauth$expectedPrivatePath"
+            }
         }
     }
 
