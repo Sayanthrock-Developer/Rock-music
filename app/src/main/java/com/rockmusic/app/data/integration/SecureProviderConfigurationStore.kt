@@ -86,10 +86,14 @@ object ProviderConfigurationValidator {
                 "Discord client ID must be a numeric application ID"
             }
 
-            ProviderConfigKey.SPOTIFY_REDIRECT_URI,
-            ProviderConfigKey.DISCORD_REDIRECT_URI,
-            ProviderConfigKey.CLOUD_REDIRECT_URI,
-            -> validateHttpsUri(key, value)
+            ProviderConfigKey.SPOTIFY_REDIRECT_URI ->
+                validateRedirectUri(key, value, expectedPrivatePath = "/spotify")
+
+            ProviderConfigKey.DISCORD_REDIRECT_URI ->
+                validateRedirectUri(key, value, expectedPrivatePath = "/discord")
+
+            ProviderConfigKey.CLOUD_REDIRECT_URI ->
+                validateRedirectUri(key, value, expectedPrivatePath = "/cloud")
 
             ProviderConfigKey.LISTEN_TOGETHER_WS_URL -> validateWssUri(key, value)
 
@@ -108,29 +112,53 @@ object ProviderConfigurationValidator {
             ProviderConfigKey.PODCAST_SEARCH_API_KEY,
             ProviderConfigKey.DOWNLOADS_API_KEY,
             ProviderConfigKey.CLOUD_CLIENT_ID,
-            -> require(value.length in 6..512 && value.none(Char::isWhitespace)) {
+            -> require(value.length in 6..512 && value.none { it.isWhitespace() }) {
                 "${key.propertyName} is malformed"
             }
+        }
+    }
+
+    private fun validateRedirectUri(
+        key: ProviderConfigKey,
+        value: String,
+        expectedPrivatePath: String,
+    ) {
+        val uri = runCatching { URI(value) }.getOrNull()
+        val clean = uri != null &&
+            uri.userInfo == null &&
+            uri.query == null &&
+            uri.fragment == null
+        val isHttpsAppLink = clean &&
+            uri?.scheme?.equals("https", ignoreCase = true) == true &&
+            !uri.host.isNullOrBlank() &&
+            uri.port == -1
+        val isRegisteredPrivateCallback = clean &&
+            uri?.scheme?.equals("rockmusic", ignoreCase = true) == true &&
+            uri.host.equals("oauth", ignoreCase = true) &&
+            uri.path == expectedPrivatePath &&
+            uri.port == -1
+        require(isHttpsAppLink || isRegisteredPrivateCallback) {
+            "${key.propertyName} must use a clean HTTPS app link or the registered rockmusic://oauth$expectedPrivatePath callback"
         }
     }
 
     private fun validateHttpsUri(key: ProviderConfigKey, value: String) {
         val uri = runCatching { URI(value) }.getOrNull()
         require(
-            uri?.scheme.equals("https", ignoreCase = true) &&
-                !uri?.host.isNullOrBlank() &&
-                uri?.userInfo == null &&
-                uri?.fragment == null,
+            uri?.scheme?.equals("https", ignoreCase = true) == true &&
+                !uri.host.isNullOrBlank() &&
+                uri.userInfo == null &&
+                uri.fragment == null,
         ) { "${key.propertyName} must be a secure HTTPS URI" }
     }
 
     private fun validateWssUri(key: ProviderConfigKey, value: String) {
         val uri = runCatching { URI(value) }.getOrNull()
         require(
-            uri?.scheme.equals("wss", ignoreCase = true) &&
-                !uri?.host.isNullOrBlank() &&
-                uri?.userInfo == null &&
-                uri?.fragment == null,
+            uri?.scheme?.equals("wss", ignoreCase = true) == true &&
+                !uri.host.isNullOrBlank() &&
+                uri.userInfo == null &&
+                uri.fragment == null,
         ) { "${key.propertyName} must be a secure WSS URI" }
     }
 }
