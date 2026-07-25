@@ -3,13 +3,18 @@ package com.rockmusic.app.presentation
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rockmusic.app.data.integration.OfficialProviderRouteLauncher
+import com.rockmusic.app.data.integration.YouTubeOfficialPlaybackProvider
 import com.rockmusic.app.data.local.LocalMusicRepository
+import com.rockmusic.app.domain.integration.OfficialProviderRoute
+import com.rockmusic.app.domain.integration.ProviderCallResult
 import com.rockmusic.app.domain.model.LocalTrack
 import com.rockmusic.app.domain.policy.MediaActionDecision
 import com.rockmusic.app.domain.policy.MediaActionPolicyEngine
 import com.rockmusic.app.domain.policy.MediaActionRequest
 import com.rockmusic.app.domain.policy.MediaOperation
 import com.rockmusic.app.domain.policy.MediaOrigin
+import com.rockmusic.app.domain.policy.ProviderAccessContext
 import com.rockmusic.app.player.PlayerConnection
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -23,6 +28,8 @@ class MainViewModel @Inject constructor(
     private val localMusicRepository: LocalMusicRepository,
     private val playerConnection: PlayerConnection,
     private val mediaActionPolicy: MediaActionPolicyEngine,
+    private val youTubeProvider: YouTubeOfficialPlaybackProvider,
+    private val officialRouteLauncher: OfficialProviderRouteLauncher,
 ) : ViewModel() {
     val playerState = playerConnection.state
 
@@ -31,6 +38,9 @@ class MainViewModel @Inject constructor(
 
     private val _lastActionDecision = MutableStateFlow<MediaActionDecision?>(null)
     val lastActionDecision: StateFlow<MediaActionDecision?> = _lastActionDecision.asStateFlow()
+
+    private val _youTubeState = MutableStateFlow(YouTubeHomeState())
+    val youTubeState: StateFlow<YouTubeHomeState> = _youTubeState.asStateFlow()
 
     fun loadLocalMusic() {
         scanDeviceMusic(
@@ -153,6 +163,63 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun openOfficialYouTubeSearch(query: String) {
+        launchOfficialRoute(youTubeProvider.routeSearch(query))
+    }
+
+    fun openOfficialYouTubeLink(link: String) {
+        launchOfficialRoute(youTubeProvider.routeTrack(link))
+    }
+
+    fun clearYouTubeStatus() {
+        _youTubeState.value = YouTubeHomeState()
+    }
+
+    private fun launchOfficialRoute(result: ProviderCallResult<OfficialProviderRoute>) {
+        _youTubeState.value = YouTubeHomeState(isLaunching = true)
+        when (result) {
+            is ProviderCallResult.Success -> {
+                val route = result.value
+                val decision = mediaActionPolicy.decide(route.toOfficialOpenRequest())
+                _lastActionDecision.value = decision
+                when (decision) {
+                    is MediaActionDecision.OpenOfficialProvider -> {
+                        officialRouteLauncher.launch(route)
+                            .onSuccess { target ->
+                                _youTubeState.value = YouTubeHomeState(
+                                    message = if (target.packageName == null) {
+                                        "Opened the validated YouTube destination in your browser."
+                                    } else {
+                                        "Opened the validated destination in an official YouTube app."
+                                    },
+                                )
+                            }
+                            .onFailure { error ->
+                                _youTubeState.value = YouTubeHomeState(
+                                    error = error.message
+                                        ?: "No official YouTube app or browser could open this destination.",
+                                )
+                            }
+                    }
+
+                    else -> {
+                        _youTubeState.value = YouTubeHomeState(error = decision.userMessage())
+                    }
+                }
+            }
+
+            is ProviderCallResult.Failure -> {
+                _youTubeState.value = YouTubeHomeState(error = result.message)
+            }
+
+            is ProviderCallResult.Unavailable -> {
+                _youTubeState.value = YouTubeHomeState(
+                    error = "Official YouTube routing is currently unavailable.",
+                )
+            }
+        }
+    }
+
     fun play(track: LocalTrack) {
         playAll(listOf(track))
     }
@@ -188,6 +255,32 @@ class MainViewModel @Inject constructor(
         sourceUri = mediaUri,
     )
 
+    private fun OfficialProviderRoute.toOfficialOpenRequest() = MediaActionRequest(
+        operation = MediaOperation.OPEN_OFFICIAL_PROVIDER,
+        origin = MediaOrigin.OFFICIAL_PROVIDER_LINK,
+        mediaId = providerMediaId ?: webUri,
+        sourceUri = webUri,
+        access = ProviderAccessContext(
+            providerName = "YouTube / YouTube Music",
+            online = true,
+            providerCapabilityGranted = true,
+            requiresOfficialClient = true,
+            officialUri = webUri,
+        ),
+    )
+
+    private fun MediaActionDecision.userMessage(): String = when (this) {
+        MediaActionDecision.ExecuteInApp ->
+            "This official provider action cannot run inside Rock Music."
+        is MediaActionDecision.OpenOfficialProvider -> reason
+        is MediaActionDecision.RequireConfiguration ->
+            "Required provider configuration is missing: ${missingKeys.joinToString()}."
+        is MediaActionDecision.RequireAuthentication ->
+            "Sign in to $providerName before continuing."
+        MediaActionDecision.Offline -> "Connect to the internet and try again."
+        is MediaActionDecision.Blocked -> reason
+    }
+
     private fun mergeTracks(
         existing: List<LocalTrack>,
         incoming: List<LocalTrack>,
@@ -201,4 +294,10 @@ data class LocalLibraryState(
     val isImporting: Boolean = false,
     val error: String? = null,
     val statusMessage: String? = null,
+)
+
+data class YouTubeHomeState(
+    val isLaunching: Boolean = false,
+    val message: String? = null,
+    val error: String? = null,
 )
