@@ -15,6 +15,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.ArrayDeque
 import javax.inject.Inject
 import kotlin.math.abs
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -176,9 +177,14 @@ class MediaStoreLocalMusicRepository @Inject constructor(
     override suspend fun resolveAll(uris: List<Uri>): List<LocalTrack> = withContext(Dispatchers.IO) {
         val uniqueUris = uris.distinctBy(Uri::toString)
         val tracks = uniqueUris.mapNotNull { uri ->
-            runCatching { resolve(uri) }
-                .onFailure { error -> Log.w(TAG, "Skipping unreadable audio URI: $uri", error) }
-                .getOrNull()
+            try {
+                resolve(uri)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                Log.w(TAG, "Skipping unreadable audio URI: $uri", error)
+                null
+            }
         }
 
         require(tracks.isNotEmpty()) {
@@ -245,13 +251,16 @@ class MediaStoreLocalMusicRepository @Inject constructor(
             "No supported audio files were found in the selected folder."
         }
 
-        val tracks = runCatching { resolveAll(audioUris) }
-            .getOrElse { error ->
-                throw IllegalArgumentException(
-                    "The selected folder contains audio files, but none could be opened.",
-                    error,
-                )
-            }
+        val tracks = try {
+            resolveAll(audioUris)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            throw IllegalArgumentException(
+                "The selected folder contains audio files, but none could be opened.",
+                error,
+            )
+        }
 
         tracks.sortedWith(
             compareBy<LocalTrack> { it.album.lowercase() }
