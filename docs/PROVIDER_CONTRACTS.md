@@ -18,6 +18,14 @@ Callbacks are accepted only when:
 
 `SpotifyPkceRequestStore` is the consume-once persistence contract. A production implementation must encrypt the verifier and state at rest, never log either value, delete the record after callback consumption, and clear expired requests.
 
+### Spotify playlist preview
+
+`SpotifyPlaylistReferenceParser` accepts only a 22-character Spotify playlist ID from either an exact `spotify:playlist:` URI or an HTTPS `open.spotify.com/playlist/` link. Share and tracking query parameters are discarded when the canonical URL is produced. Track, album, artist, HTTP, credential-bearing, malformed, and non-Spotify links are rejected.
+
+`SpotifyPlaylistClient` uses the user-authorised PKCE token stored in Android Keystore-backed storage. It refreshes an expiring token with the public mobile client ID and refresh token, requests playlist metadata from the official Spotify Web API, skips unavailable or non-track entries safely, and exposes only display metadata to the UI. Bearer and refresh tokens are never embedded in source, displayed, or logged.
+
+Rock Music may display playlist artwork, owner, track count, and a short track preview. Playback, saving, and full playlist interaction continue through Spotify's official application or web route. The preview does not provide audio extraction, protected downloads, ad bypass, or subscription bypass.
+
 ## Licensed Echo Find
 
 `EchoFindRecognitionRequest` carries the short audio sample, MIME type, duration, SHA-256 digest, locale, and an explicit `RecognitionConsent` record. A production adapter must enforce sample-size and duration limits before upload, use HTTPS, and avoid provider history unless the consent flag allows it.
