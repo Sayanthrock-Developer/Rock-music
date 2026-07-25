@@ -80,50 +80,62 @@ class MusicService : MediaSessionService() {
         override fun onConnect(
             session: MediaSession,
             controller: MediaSession.ControllerInfo,
-        ): ConnectionResult = AcceptedResultBuilder(session)
-            .setAvailableSessionCommands(
+        ): ConnectionResult {
+            val sessionCommands = if (controller.isTrusted) {
                 ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
                     .add(MediaSessionCommands.toggleFavourite)
                     .add(MediaSessionCommands.openLyrics)
-                    .build(),
-            )
-            .build()
+                    .build()
+            } else {
+                ConnectionResult.DEFAULT_UNTRUSTED_SESSION_COMMANDS
+            }
+            return AcceptedResultBuilder(session)
+                .setAvailableSessionCommands(sessionCommands)
+                .build()
+        }
 
         override fun onCustomCommand(
             session: MediaSession,
             controller: MediaSession.ControllerInfo,
             customCommand: SessionCommand,
             args: Bundle,
-        ): ListenableFuture<SessionResult> = when (customCommand.customAction) {
-            MediaSessionCommands.ACTION_TOGGLE_FAVOURITE -> {
-                val current = player.currentMediaItem
-                if (current == null) {
-                    Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE))
-                } else {
-                    favouriteStore.toggle(current.mediaId)
-                    syncFavouriteMetadata(current)
+        ): ListenableFuture<SessionResult> {
+            if (!controller.isTrusted) {
+                return Futures.immediateFuture(
+                    SessionResult(SessionResult.RESULT_ERROR_PERMISSION_DENIED),
+                )
+            }
+            return when (customCommand.customAction) {
+                MediaSessionCommands.ACTION_TOGGLE_FAVOURITE -> {
+                    val current = player.currentMediaItem
+                    if (current == null) {
+                        Futures.immediateFuture(SessionResult(SessionResult.RESULT_ERROR_BAD_VALUE))
+                    } else {
+                        favouriteStore.toggle(current.mediaId)
+                        syncFavouriteMetadata(current)
+                        Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                    }
+                }
+
+                MediaSessionCommands.ACTION_OPEN_LYRICS -> {
+                    startActivity(
+                        Intent(this@MusicService, MainActivity::class.java).apply {
+                            addFlags(
+                                Intent.FLAG_ACTIVITY_NEW_TASK or
+                                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                                    Intent.FLAG_ACTIVITY_SINGLE_TOP,
+                            )
+                            putExtra(
+                                MediaSessionCommands.EXTRA_OPEN_PLAYER_SURFACE,
+                                MediaSessionCommands.SURFACE_LYRICS,
+                            )
+                        },
+                    )
                     Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                 }
-            }
 
-            MediaSessionCommands.ACTION_OPEN_LYRICS -> {
-                startActivity(
-                    Intent(this@MusicService, MainActivity::class.java).apply {
-                        addFlags(
-                            Intent.FLAG_ACTIVITY_NEW_TASK or
-                                Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                                Intent.FLAG_ACTIVITY_SINGLE_TOP,
-                        )
-                        putExtra(
-                            MediaSessionCommands.EXTRA_OPEN_PLAYER_SURFACE,
-                            MediaSessionCommands.SURFACE_LYRICS,
-                        )
-                    },
-                )
-                Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                else -> super.onCustomCommand(session, controller, customCommand, args)
             }
-
-            else -> super.onCustomCommand(session, controller, customCommand, args)
         }
     }
 
