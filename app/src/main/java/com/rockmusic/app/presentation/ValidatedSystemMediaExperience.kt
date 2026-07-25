@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rockmusic.app.player.MediaSessionCommands
 
 @Composable
 fun ValidatedSystemMediaExperience(
@@ -18,16 +19,19 @@ fun ValidatedSystemMediaExperience(
     mainViewModel: MainViewModel = hiltViewModel(),
 ) {
     val player by mainViewModel.playerState.collectAsStateWithLifecycle()
+    val validatedSurface = requestedPlayerSurface?.takeIf {
+        it == MediaSessionCommands.SURFACE_LYRICS
+    }
 
-    LaunchedEffect(requestedPlayerSurface, player.hasMedia) {
-        if (requestedPlayerSurface != null && !player.hasMedia) {
+    LaunchedEffect(requestedPlayerSurface, validatedSurface, player.hasMedia) {
+        if (requestedPlayerSurface != null && (validatedSurface == null || !player.hasMedia)) {
             onRequestedPlayerSurfaceConsumed()
         }
     }
 
     SystemMediaExperience(
         useBlurFrames = useBlurFrames,
-        requestedPlayerSurface = requestedPlayerSurface.takeIf { player.hasMedia },
+        requestedPlayerSurface = validatedSurface.takeIf { player.hasMedia },
         onRequestedPlayerSurfaceConsumed = onRequestedPlayerSurfaceConsumed,
         onOpenAppearance = onOpenAppearance,
         onOpenConnections = onOpenConnections,
