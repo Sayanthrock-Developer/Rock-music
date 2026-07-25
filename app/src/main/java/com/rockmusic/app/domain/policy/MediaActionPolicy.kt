@@ -31,6 +31,7 @@ data class ProviderAccessContext(
     val authenticationRequired: Boolean = false,
     val authenticated: Boolean = false,
     val online: Boolean = true,
+    val locallyAvailable: Boolean = false,
     val regionalAccessAllowed: Boolean = true,
     val playbackEntitled: Boolean = false,
     val providerCapabilityGranted: Boolean = false,
@@ -83,26 +84,29 @@ sealed interface MediaActionDecision {
 class MediaActionPolicyEngine @Inject constructor() {
     fun decide(request: MediaActionRequest): MediaActionDecision {
         val access = request.access
-        val providerBacked = request.origin in REMOTE_ORIGINS ||
+        val providerConfiguredAction = request.origin in PROVIDER_ORIGINS ||
             request.operation in PROVIDER_OPERATIONS
+        val requiresNetwork = (
+            request.origin != MediaOrigin.LOCAL_FILE && !access.locallyAvailable
+            ) || request.operation in PROVIDER_OPERATIONS
 
-        if (providerBacked && access.missingConfigurationKeys.isNotEmpty()) {
+        if (providerConfiguredAction && access.missingConfigurationKeys.isNotEmpty()) {
             return MediaActionDecision.RequireConfiguration(access.missingConfigurationKeys)
         }
 
-        if (providerBacked && !access.online) {
+        if (requiresNetwork && !access.online) {
             return MediaActionDecision.Offline
         }
 
-        if (providerBacked && access.authenticationRequired && !access.authenticated) {
+        if (providerConfiguredAction && access.authenticationRequired && !access.authenticated) {
             return MediaActionDecision.RequireAuthentication(
                 providerName = access.providerName ?: "Provider",
             )
         }
 
-        if (providerBacked && !access.regionalAccessAllowed) {
+        if (requiresNetwork && !access.regionalAccessAllowed) {
             return MediaActionDecision.Blocked(
-                reason = "This provider does not grant access in the current region.",
+                reason = "This source does not grant access in the current region.",
             )
         }
 
@@ -209,7 +213,7 @@ class MediaActionPolicyEngine @Inject constructor() {
             )
 
     private companion object {
-        val REMOTE_ORIGINS = setOf(
+        val PROVIDER_ORIGINS = setOf(
             MediaOrigin.USER_CLOUD,
             MediaOrigin.LICENSED_CATALOGUE,
             MediaOrigin.OFFICIAL_PROVIDER_LINK,
