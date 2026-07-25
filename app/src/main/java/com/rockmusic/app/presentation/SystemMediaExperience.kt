@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -67,7 +66,7 @@ import com.rockmusic.app.player.PlayerQueueItem
 import com.rockmusic.app.player.PlayerUiState
 import com.rockmusic.app.player.SystemAudioRoute
 
-private enum class SystemPlayerPanel(val label: String) {
+private enum class PlayerPanel(val label: String) {
     QUEUE("Queue"),
     LYRICS("Lyrics"),
     OUTPUT("Output"),
@@ -83,22 +82,19 @@ fun SystemMediaExperience(
     onOpenSongManager: () -> Unit,
     onOpenFolderManager: () -> Unit,
     mainViewModel: MainViewModel = hiltViewModel(),
-    systemMediaViewModel: SystemMediaViewModel = hiltViewModel(),
+    controlsViewModel: SystemMediaViewModel = hiltViewModel(),
 ) {
     val player by mainViewModel.playerState.collectAsStateWithLifecycle()
-    val lyricsState by systemMediaViewModel.lyricsState.collectAsStateWithLifecycle()
-    val routeState by systemMediaViewModel.routeState.collectAsStateWithLifecycle()
-    var showSystemPlayer by rememberSaveable { mutableStateOf(false) }
-    var selectedPanel by rememberSaveable { mutableStateOf(SystemPlayerPanel.QUEUE) }
+    val lyrics by controlsViewModel.lyricsState.collectAsStateWithLifecycle()
+    val routes by controlsViewModel.routeState.collectAsStateWithLifecycle()
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    var panel by rememberSaveable { mutableStateOf(PlayerPanel.QUEUE) }
 
     LaunchedEffect(requestedPlayerSurface, player.hasMedia) {
-        if (
-            requestedPlayerSurface == MediaSessionCommands.SURFACE_LYRICS &&
-            player.hasMedia
-        ) {
-            showSystemPlayer = true
-            selectedPanel = SystemPlayerPanel.LYRICS
-            systemMediaViewModel.loadLyrics(player.mediaUri)
+        if (requestedPlayerSurface == MediaSessionCommands.SURFACE_LYRICS && player.hasMedia) {
+            expanded = true
+            panel = PlayerPanel.LYRICS
+            controlsViewModel.loadLyrics(player.mediaUri)
             onRequestedPlayerSurfaceConsumed()
         }
     }
@@ -113,10 +109,10 @@ fun SystemMediaExperience(
             viewModel = mainViewModel,
         )
 
-        if (player.hasMedia && !showSystemPlayer) {
-            CompactMediaPill(
+        if (player.hasMedia && !expanded) {
+            MediaPill(
                 player = player,
-                onOpen = { showSystemPlayer = true },
+                onOpen = { expanded = true },
                 onToggle = mainViewModel::togglePlayPause,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -125,36 +121,36 @@ fun SystemMediaExperience(
             )
         }
 
-        if (showSystemPlayer && player.hasMedia) {
-            SystemPlayerCard(
+        if (expanded && player.hasMedia) {
+            ExpandedSystemPlayer(
                 player = player,
-                selectedPanel = selectedPanel,
-                lyricsState = lyricsState,
-                routeState = routeState,
-                onClose = { showSystemPlayer = false },
-                onPanelSelected = { panel ->
-                    selectedPanel = panel
-                    when (panel) {
-                        SystemPlayerPanel.LYRICS -> systemMediaViewModel.loadLyrics(player.mediaUri)
-                        SystemPlayerPanel.OUTPUT -> systemMediaViewModel.refreshAudioRoutes()
-                        SystemPlayerPanel.QUEUE -> Unit
+                selectedPanel = panel,
+                lyrics = lyrics,
+                routes = routes,
+                onClose = { expanded = false },
+                onPanel = { selected ->
+                    panel = selected
+                    when (selected) {
+                        PlayerPanel.QUEUE -> Unit
+                        PlayerPanel.LYRICS -> controlsViewModel.loadLyrics(player.mediaUri)
+                        PlayerPanel.OUTPUT -> controlsViewModel.refreshAudioRoutes()
                     }
                 },
-                onToggleFavourite = systemMediaViewModel::toggleFavourite,
+                onFavourite = controlsViewModel::toggleFavourite,
                 onPrevious = mainViewModel::skipPrevious,
                 onToggle = mainViewModel::togglePlayPause,
                 onNext = mainViewModel::skipNext,
                 onSeek = mainViewModel::seekTo,
-                onVolume = systemMediaViewModel::setVolume,
-                onQueueItem = systemMediaViewModel::playQueueIndex,
-                onRoute = systemMediaViewModel::selectAudioRoute,
+                onVolume = controlsViewModel::setVolume,
+                onQueueItem = controlsViewModel::playQueueIndex,
+                onRoute = controlsViewModel::selectAudioRoute,
             )
         }
     }
 }
 
 @Composable
-private fun CompactMediaPill(
+private fun MediaPill(
     player: PlayerUiState,
     onOpen: () -> Unit,
     onToggle: () -> Unit,
@@ -162,23 +158,18 @@ private fun CompactMediaPill(
 ) {
     Surface(
         modifier = modifier
-            .width(210.dp)
-            .height(58.dp)
+            .width(220.dp)
+            .height(60.dp)
             .clickable(onClick = onOpen),
-        shape = RoundedCornerShape(30.dp),
+        shape = RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.96f),
         shadowElevation = 10.dp,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+            modifier = Modifier.padding(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SystemArtwork(
-                artworkUri = player.artworkUri,
-                title = player.title.orEmpty(),
-                modifier = Modifier.size(44.dp),
-                shape = RoundedCornerShape(16.dp),
-            )
+            Artwork(player.artworkUri, player.title.orEmpty(), Modifier.size(44.dp), 15)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(
@@ -216,14 +207,14 @@ private fun CompactMediaPill(
 }
 
 @Composable
-private fun SystemPlayerCard(
+private fun ExpandedSystemPlayer(
     player: PlayerUiState,
-    selectedPanel: SystemPlayerPanel,
-    lyricsState: LyricsUiState,
-    routeState: AudioRouteUiState,
+    selectedPanel: PlayerPanel,
+    lyrics: LyricsUiState,
+    routes: AudioRouteUiState,
     onClose: () -> Unit,
-    onPanelSelected: (SystemPlayerPanel) -> Unit,
-    onToggleFavourite: () -> Unit,
+    onPanel: (PlayerPanel) -> Unit,
+    onFavourite: () -> Unit,
     onPrevious: () -> Unit,
     onToggle: () -> Unit,
     onNext: () -> Unit,
@@ -233,199 +224,187 @@ private fun SystemPlayerCard(
     onRoute: (Int) -> Unit,
 ) {
     BackHandler(onBack = onClose)
-    Box(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.34f),
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
                         MaterialTheme.colorScheme.surface,
                         MaterialTheme.colorScheme.surface,
                     ),
                 ),
             )
             .statusBarsPadding(),
+        contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = 20.dp,
-                end = 20.dp,
-                top = 18.dp,
-                bottom = 32.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Media player", style = MaterialTheme.typography.headlineSmall)
-                        Text(
-                            "Rock Music system controls",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    IconButton(onClick = { onPanelSelected(SystemPlayerPanel.OUTPUT) }) {
-                        Icon(Icons.Rounded.Speaker, contentDescription = "Choose audio output")
-                    }
-                    IconButton(onClick = onClose) {
-                        Icon(Icons.Rounded.Close, contentDescription = "Close media player")
-                    }
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Media player", style = MaterialTheme.typography.headlineSmall)
+                    Text("Rock Music system controls", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                IconButton(onClick = { onPanel(PlayerPanel.OUTPUT) }) {
+                    Icon(Icons.Rounded.Speaker, contentDescription = "Choose audio output")
+                }
+                IconButton(onClick = onClose) {
+                    Icon(Icons.Rounded.Close, contentDescription = "Close media player")
                 }
             }
+        }
 
-            item {
-                Surface(
-                    shape = RoundedCornerShape(36.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shadowElevation = 8.dp,
+        item {
+            Surface(
+                shape = RoundedCornerShape(34.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shadowElevation = 8.dp,
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        SystemArtwork(
-                            artworkUri = player.artworkUri,
-                            title = player.title.orEmpty(),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(320.dp),
-                            shape = RoundedCornerShape(30.dp),
-                        )
-                        Spacer(Modifier.height(18.dp))
-                        Text(
-                            player.title.orEmpty(),
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Black,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            player.artist.orEmpty(),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Spacer(Modifier.height(18.dp))
+                    Artwork(
+                        player.artworkUri,
+                        player.title.orEmpty(),
+                        Modifier
+                            .fillMaxWidth()
+                            .height(320.dp),
+                        28,
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        player.title.orEmpty(),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        player.artist.orEmpty(),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    Slider(
+                        value = player.positionMs.coerceAtMost(player.durationMs).toFloat(),
+                        onValueChange = { onSeek(it.toLong()) },
+                        valueRange = 0f..player.durationMs.coerceAtLeast(1L).toFloat(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(Modifier.fillMaxWidth()) {
+                        Text(duration(player.positionMs))
+                        Spacer(Modifier.weight(1f))
+                        Text(duration(player.durationMs))
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    PlaybackButtons(
+                        player = player,
+                        onFavourite = onFavourite,
+                        onPrevious = onPrevious,
+                        onToggle = onToggle,
+                        onNext = onNext,
+                        onLyrics = { onPanel(PlayerPanel.LYRICS) },
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.VolumeDown, contentDescription = null)
                         Slider(
-                            value = player.positionMs.coerceAtMost(player.durationMs).toFloat(),
-                            onValueChange = { onSeek(it.toLong()) },
-                            valueRange = 0f..player.durationMs.coerceAtLeast(1L).toFloat(),
-                            modifier = Modifier.fillMaxWidth(),
+                            value = player.volume,
+                            onValueChange = onVolume,
+                            valueRange = 0f..1f,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 10.dp),
                         )
-                        Row(Modifier.fillMaxWidth()) {
-                            Text(systemDuration(player.positionMs))
-                            Spacer(Modifier.weight(1f))
-                            Text(systemDuration(player.durationMs))
-                        }
-                        Spacer(Modifier.height(10.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            IconButton(onClick = onToggleFavourite) {
-                                Icon(
-                                    if (player.isFavourite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                                    contentDescription = if (player.isFavourite) {
-                                        "Remove from favourites"
-                                    } else {
-                                        "Add to favourites"
-                                    },
-                                )
-                            }
-                            IconButton(onClick = onPrevious, enabled = player.hasPrevious) {
-                                Icon(Icons.Rounded.SkipPrevious, contentDescription = "Previous song")
-                            }
-                            FilledIconButton(
-                                onClick = onToggle,
-                                enabled = !player.isPreparing,
-                                modifier = Modifier.size(70.dp),
-                            ) {
-                                if (player.isPreparing) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(30.dp),
-                                        strokeWidth = 3.dp,
-                                    )
-                                } else {
-                                    Icon(
-                                        if (player.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                        contentDescription = "Play or pause",
-                                        modifier = Modifier.size(36.dp),
-                                    )
-                                }
-                            }
-                            IconButton(onClick = onNext, enabled = player.hasNext) {
-                                Icon(Icons.Rounded.SkipNext, contentDescription = "Next song")
-                            }
-                            IconButton(onClick = { onPanelSelected(SystemPlayerPanel.LYRICS) }) {
-                                Icon(Icons.Rounded.Subtitles, contentDescription = "Open lyrics")
-                            }
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(Icons.Rounded.VolumeDown, contentDescription = null)
-                            Slider(
-                                value = player.volume,
-                                onValueChange = onVolume,
-                                valueRange = 0f..1f,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(horizontal = 10.dp),
+                        Icon(Icons.Rounded.VolumeUp, contentDescription = null)
+                    }
+                }
+            }
+        }
+
+        item {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(PlayerPanel.entries, key = PlayerPanel::name) { option ->
+                    FilterChip(
+                        selected = selectedPanel == option,
+                        onClick = { onPanel(option) },
+                        label = { Text(option.label) },
+                        leadingIcon = {
+                            Icon(
+                                when (option) {
+                                    PlayerPanel.QUEUE -> Icons.Rounded.QueueMusic
+                                    PlayerPanel.LYRICS -> Icons.Rounded.Subtitles
+                                    PlayerPanel.OUTPUT -> Icons.Rounded.Speaker
+                                },
+                                contentDescription = null,
                             )
-                            Icon(Icons.Rounded.VolumeUp, contentDescription = null)
-                        }
-                    }
-                }
-            }
-
-            item {
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(SystemPlayerPanel.entries, key = SystemPlayerPanel::name) { panel ->
-                        FilterChip(
-                            selected = selectedPanel == panel,
-                            onClick = { onPanelSelected(panel) },
-                            label = { Text(panel.label) },
-                            leadingIcon = {
-                                Icon(
-                                    when (panel) {
-                                        SystemPlayerPanel.QUEUE -> Icons.Rounded.QueueMusic
-                                        SystemPlayerPanel.LYRICS -> Icons.Rounded.Subtitles
-                                        SystemPlayerPanel.OUTPUT -> Icons.Rounded.Speaker
-                                    },
-                                    contentDescription = null,
-                                )
-                            },
-                        )
-                    }
-                }
-            }
-
-            when (selectedPanel) {
-                SystemPlayerPanel.QUEUE -> item {
-                    QueuePanel(
-                        queue = player.queue,
-                        currentIndex = player.currentQueueIndex,
-                        onQueueItem = onQueueItem,
+                        },
                     )
                 }
-
-                SystemPlayerPanel.LYRICS -> item { LyricsPanel(lyricsState) }
-                SystemPlayerPanel.OUTPUT -> item {
-                    OutputPanel(routeState = routeState, onRoute = onRoute)
-                }
             }
+        }
+
+        item {
+            when (selectedPanel) {
+                PlayerPanel.QUEUE -> QueuePanel(player.queue, player.currentQueueIndex, onQueueItem)
+                PlayerPanel.LYRICS -> LyricsPanel(lyrics)
+                PlayerPanel.OUTPUT -> OutputPanel(routes, onRoute)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaybackButtons(
+    player: PlayerUiState,
+    onFavourite: () -> Unit,
+    onPrevious: () -> Unit,
+    onToggle: () -> Unit,
+    onNext: () -> Unit,
+    onLyrics: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onFavourite) {
+            Icon(
+                if (player.isFavourite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                contentDescription = if (player.isFavourite) {
+                    "Remove from favourites"
+                } else {
+                    "Add to favourites"
+                },
+            )
+        }
+        IconButton(onClick = onPrevious, enabled = player.hasPrevious) {
+            Icon(Icons.Rounded.SkipPrevious, contentDescription = "Previous song")
+        }
+        FilledIconButton(
+            onClick = onToggle,
+            enabled = !player.isPreparing,
+            modifier = Modifier.size(70.dp),
+        ) {
+            if (player.isPreparing) {
+                CircularProgressIndicator(Modifier.size(30.dp), strokeWidth = 3.dp)
+            } else {
+                Icon(
+                    if (player.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                    contentDescription = "Play or pause",
+                    modifier = Modifier.size(36.dp),
+                )
+            }
+        }
+        IconButton(onClick = onNext, enabled = player.hasNext) {
+            Icon(Icons.Rounded.SkipNext, contentDescription = "Next song")
+        }
+        IconButton(onClick = onLyrics) {
+            Icon(Icons.Rounded.Subtitles, contentDescription = "Open lyrics")
         }
     }
 }
@@ -436,52 +415,38 @@ private fun QueuePanel(
     currentIndex: Int,
     onQueueItem: (Int) -> Unit,
 ) {
-    Surface(shape = RoundedCornerShape(26.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Up next", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            if (queue.isEmpty()) {
-                Text("The current queue is empty.")
-            } else {
-                queue.forEachIndexed { index, item ->
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onQueueItem(index) },
-                        shape = RoundedCornerShape(18.dp),
-                        color = if (index == currentIndex) {
-                            MaterialTheme.colorScheme.primaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.surfaceContainerHigh
-                        },
+    PanelSurface("Up next") {
+        if (queue.isEmpty()) {
+            Text("The current queue is empty.")
+        } else {
+            queue.forEachIndexed { index, item ->
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onQueueItem(index) },
+                    shape = RoundedCornerShape(18.dp),
+                    color = if (index == currentIndex) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHigh
+                    },
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Row(
-                            modifier = Modifier.padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            SystemArtwork(
-                                artworkUri = item.artworkUri,
-                                title = item.title,
-                                modifier = Modifier.size(48.dp),
-                                shape = RoundedCornerShape(14.dp),
+                        Artwork(item.artworkUri, item.title, Modifier.size(48.dp), 14)
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(item.title, fontWeight = FontWeight.Bold, maxLines = 1)
+                            Text(
+                                item.artist,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
                             )
-                            Spacer(Modifier.width(10.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    item.title,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    item.artist,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                            if (index == currentIndex) {
-                                Icon(Icons.Rounded.GraphicEq, contentDescription = "Currently playing")
-                            }
+                        }
+                        if (index == currentIndex) {
+                            Icon(Icons.Rounded.GraphicEq, contentDescription = "Currently playing")
                         }
                     }
                 }
@@ -492,50 +457,41 @@ private fun QueuePanel(
 
 @Composable
 private fun LyricsPanel(state: LyricsUiState) {
-    Surface(shape = RoundedCornerShape(26.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Embedded lyrics", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            when {
-                state.isLoading -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(10.dp))
-                    Text("Reading lyrics from this audio file…")
-                }
-
-                state.error != null -> Text(state.error, color = MaterialTheme.colorScheme.error)
-                state.lyrics != null -> Text(state.lyrics)
-                else -> Text(state.message ?: "Open Lyrics to read embedded local lyrics.")
+    PanelSurface("Local lyrics") {
+        when {
+            state.isLoading -> Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(10.dp))
+                Text("Looking for a matching .lrc or .txt file…")
             }
+            state.error != null -> Text(state.error, color = MaterialTheme.colorScheme.error)
+            state.lyrics != null -> Text(state.lyrics)
+            else -> Text(
+                state.message
+                    ?: "Place a same-named .lrc or .txt file beside the local song to show lyrics.",
+            )
         }
     }
 }
 
 @Composable
-private fun OutputPanel(
-    routeState: AudioRouteUiState,
-    onRoute: (Int) -> Unit,
-) {
-    Surface(shape = RoundedCornerShape(26.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Audio output", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            routeState.message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
-            routeState.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            if (routeState.routes.isEmpty() && routeState.error == null) {
-                Text("No selectable Android audio routes are currently available.")
-            }
-            routeState.routes.forEach { route ->
-                AudioRouteRow(route = route, onClick = { onRoute(route.index) })
-            }
+private fun OutputPanel(state: AudioRouteUiState, onRoute: (Int) -> Unit) {
+    PanelSurface("Audio output") {
+        state.message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+        state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        if (state.routes.isEmpty() && state.error == null) {
+            Text("No selectable Android audio routes are currently available.")
         }
+        state.routes.forEach { route -> RouteRow(route, onRoute) }
     }
 }
 
 @Composable
-private fun AudioRouteRow(route: SystemAudioRoute, onClick: () -> Unit) {
+private fun RouteRow(route: SystemAudioRoute, onRoute: (Int) -> Unit) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = route.isEnabled, onClick = onClick),
+            .clickable(enabled = route.isEnabled) { onRoute(route.index) },
         shape = RoundedCornerShape(18.dp),
         color = if (route.isSelected) {
             MaterialTheme.colorScheme.primaryContainer
@@ -558,15 +514,28 @@ private fun AudioRouteRow(route: SystemAudioRoute, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SystemArtwork(
-    artworkUri: String?,
+private fun PanelSurface(title: String, content: @Composable Column.() -> Unit) {
+    Surface(shape = RoundedCornerShape(26.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            content()
+        }
+    }
+}
+
+@Composable
+private fun Artwork(
+    uri: String?,
     title: String,
     modifier: Modifier,
-    shape: RoundedCornerShape,
+    radius: Int,
 ) {
     Box(
         modifier = modifier
-            .clip(shape)
+            .clip(RoundedCornerShape(radius.dp))
             .background(
                 Brush.linearGradient(
                     listOf(
@@ -577,15 +546,11 @@ private fun SystemArtwork(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        if (artworkUri.isNullOrBlank()) {
-            Icon(
-                Icons.Rounded.LibraryMusic,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-            )
+        if (uri.isNullOrBlank()) {
+            Icon(Icons.Rounded.LibraryMusic, contentDescription = null, modifier = Modifier.size(48.dp))
         } else {
             AsyncImage(
-                model = artworkUri,
+                model = uri,
                 contentDescription = "Artwork for $title",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
@@ -594,7 +559,7 @@ private fun SystemArtwork(
     }
 }
 
-private fun systemDuration(valueMs: Long): String {
-    val totalSeconds = valueMs.coerceAtLeast(0L) / 1_000L
-    return "%d:%02d".format(totalSeconds / 60L, totalSeconds % 60L)
+private fun duration(valueMs: Long): String {
+    val seconds = valueMs.coerceAtLeast(0L) / 1_000L
+    return "%d:%02d".format(seconds / 60L, seconds % 60L)
 }
