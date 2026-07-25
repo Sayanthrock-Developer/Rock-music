@@ -16,6 +16,8 @@ ROCK_ECHO_FIND_API_KEY=
 ROCK_LISTEN_TOGETHER_REST_URL=
 ROCK_LISTEN_TOGETHER_WS_URL=
 ROCK_DISCORD_CLIENT_ID=
+ROCK_DISCORD_REDIRECT_URI=
+ROCK_DISCORD_ACTIVITY_BACKEND_URL=
 ROCK_CATALOGUE_BASE_URL=
 ROCK_CATALOGUE_API_KEY=
 ROCK_LYRICS_BASE_URL=
@@ -49,13 +51,13 @@ gradle :app:assembleDebug \
 | Spotify PKCE | `ROCK_SPOTIFY_CLIENT_ID`, `ROCK_SPOTIFY_REDIRECT_URI` | `AuthenticationRequired` until the user authorises | Playlist metadata import and official playback only |
 | Echo Find | `ROCK_ECHO_FIND_BASE_URL`, `ROCK_ECHO_FIND_API_KEY` | `Available` for consent and connectivity checks | Short-sample recognition through a licensed provider |
 | Listen Together | `ROCK_LISTEN_TOGETHER_REST_URL`, `ROCK_LISTEN_TOGETHER_WS_URL` | `AuthenticationRequired` | REST room lifecycle and authenticated WebSocket events |
-| Discord | `ROCK_DISCORD_CLIENT_ID` | `AuthenticationRequired` | Optional activity sharing through an official supported API |
+| Discord | `ROCK_DISCORD_CLIENT_ID`, `ROCK_DISCORD_REDIRECT_URI`, `ROCK_DISCORD_ACTIVITY_BACKEND_URL` | `AuthenticationRequired` | User-enabled activity sharing through an official supported API and controlled backend |
 | Licensed catalogue | `ROCK_CATALOGUE_BASE_URL`, `ROCK_CATALOGUE_API_KEY` | `AuthenticationRequired` | Search and provider-authorised streaming or official handoff |
 | Lyrics | `ROCK_LYRICS_BASE_URL`, `ROCK_LYRICS_API_KEY` | `Available` | Synchronized lyrics only under provider terms |
 | Podcast search | `ROCK_PODCAST_SEARCH_BASE_URL`, `ROCK_PODCAST_SEARCH_API_KEY` | `Available` | Directory search; direct RSS import remains independent |
 | Permitted downloads | `ROCK_DOWNLOADS_BASE_URL`, `ROCK_DOWNLOADS_API_KEY` | `Available` | Item-level grant and revalidation; denied by default |
 | Cloud storage | `ROCK_CLOUD_CLIENT_ID`, `ROCK_CLOUD_REDIRECT_URI` | `AuthenticationRequired` | User-authorised files only |
-| YouTube / YouTube Music | none | `Available` | Official Android app or browser deep links only |
+| YouTube / YouTube Music | none | `Available` | Validated official Android app or browser routes only |
 
 ## Android security model
 
@@ -66,18 +68,22 @@ Allowed in the app:
 - public OAuth client IDs;
 - redirect URIs;
 - public service URLs;
-- provider-issued publishable mobile keys.
+- provider-issued publishable and Android-restricted mobile keys.
 
 Must remain on the backend:
 
 - OAuth client secrets;
 - signing secrets;
 - privileged catalogue credentials;
-- unrestricted recognition, lyrics, podcast, download, or storage API keys;
+- unrestricted recognition, lyrics, podcast, download, storage, or Discord credentials;
 - webhook verification secrets;
 - database and infrastructure credentials.
 
 When a provider requires a private secret, Rock Music calls a controlled backend that holds the secret and returns only the minimum user-authorised result.
+
+## OAuth state and verifier storage
+
+OAuth state and PKCE verifiers are temporary credentials. Production implementations must encrypt them at rest, bind them to the expected redirect and provider, consume them exactly once, never log them, and clear expired records. Redirect callbacks must validate the exact scheme, authority, path, state, and request lifetime before exchanging a code.
 
 ## Status rules
 
@@ -91,3 +97,5 @@ The runtime registry reports one of the shared states:
 - `Error`: the provider returned a recoverable or permanent failure.
 
 Configuration status is not treated as proof that a remote service is healthy. Provider adapters must still perform connectivity, authentication, entitlement, regional-access and item-capability checks through `MediaActionPolicyEngine` before executing an action.
+
+See [`PROVIDER_CONTRACTS.md`](PROVIDER_CONTRACTS.md) for the request, response, entitlement, and routing contracts.
