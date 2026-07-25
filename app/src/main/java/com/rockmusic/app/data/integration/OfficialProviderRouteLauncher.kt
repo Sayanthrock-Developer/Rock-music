@@ -84,7 +84,7 @@ class OfficialProviderRouteLauncher @Inject constructor(
         targets.forEach { target ->
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(target.uri)).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                target.packageName?.let(::setPackage)
+                target.packageName?.let { packageName -> setPackage(packageName) }
             }
             try {
                 context.startActivity(intent)
