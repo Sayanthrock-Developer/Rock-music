@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: android-${{ github.ref }}
@@ -22,11 +22,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Prepare Compose compatibility diagnostic
-        run: |
-          sed -i '/import androidx.compose.foundation.layout.weight/d' app/src/main/java/com/rockmusic/app/presentation/RockMusicRoot.kt
-          sed -i '/import androidx.compose.foundation.layout.weight/d' app/src/main/java/com/rockmusic/app/presentation/settings/AppearanceScreen.kt
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -43,21 +38,6 @@ jobs:
         run: |
           set -o pipefail
           gradle --no-daemon :app:lintDebug :app:testDebugUnitTest :app:assembleDebug 2>&1 | tee gradle-verification.log
-
-      - name: Persist verified Compose compatibility fix
-        if: success() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        run: |
-          git fetch origin "${{ github.head_ref }}"
-          git checkout -B "${{ github.head_ref }}" "origin/${{ github.head_ref }}"
-          sed -i '/import androidx.compose.foundation.layout.weight/d' app/src/main/java/com/rockmusic/app/presentation/RockMusicRoot.kt
-          sed -i '/import androidx.compose.foundation.layout.weight/d' app/src/main/java/com/rockmusic/app/presentation/settings/AppearanceScreen.kt
-          if ! git diff --quiet -- app/src/main/java/com/rockmusic/app/presentation/RockMusicRoot.kt app/src/main/java/com/rockmusic/app/presentation/settings/AppearanceScreen.kt; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add app/src/main/java/com/rockmusic/app/presentation/RockMusicRoot.kt app/src/main/java/com/rockmusic/app/presentation/settings/AppearanceScreen.kt
-            git commit -m "fix: remove invalid Compose weight imports"
-            git push origin "HEAD:${{ github.head_ref }}"
-          fi
 
       - name: Upload verification log
         if: always()
