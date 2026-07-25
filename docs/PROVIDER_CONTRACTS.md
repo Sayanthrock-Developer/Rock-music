@@ -61,9 +61,9 @@ Clients must preserve attribution, obey caching limits, and not synthesize provi
 
 ## Permitted downloads
 
-A download is denied by default. `DownloadGrant` is usable only when its `DownloadPermission.permitted` value is true and `DownloadGrantValidator` confirms:
+A download is denied by default. `DownloadGrant` is usable only when its `DownloadGrantPermission.permitted` value is true and `DownloadGrantValidator` confirms:
 
-- provider and media IDs match the requested item;
+- provider and media IDs are non-blank and match the requested item;
 - the grant is within its not-before and expiry window;
 - the URL is HTTPS;
 - any SHA-256 value is correctly formed.
