@@ -8,10 +8,10 @@
     "https://rock-music.example.invalid/github/callback"
   ],
   "setup_url": "https://rock-music.example.invalid/github/setup",
-  "setup_on_update": true,
+  "setup_on_update": false,
   "hook_attributes": {
     "url": "https://rock-music.example.invalid/github/webhook",
-    "active": true
+    "active": false
   },
   "default_permissions": {
     "actions": "read",
