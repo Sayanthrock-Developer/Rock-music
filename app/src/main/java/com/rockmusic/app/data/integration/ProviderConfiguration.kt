@@ -1,6 +1,8 @@
 package com.rockmusic.app.data.integration
 
 import com.rockmusic.app.BuildConfig
+import com.rockmusic.app.domain.integration.IntegrationId
+import com.rockmusic.app.domain.integration.ProviderDefinitions
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -64,4 +66,41 @@ class BuildConfigProviderConfigurationSource @Inject constructor() : ProviderCon
         ProviderConfigKey.CLOUD_CLIENT_ID -> BuildConfig.ROCK_CLOUD_CLIENT_ID
         ProviderConfigKey.CLOUD_REDIRECT_URI -> BuildConfig.ROCK_CLOUD_REDIRECT_URI
     }.trim()
+}
+
+/**
+ * Runtime source used by provider clients and the Connections screen.
+ *
+ * User-entered public configuration is encrypted by [SecureProviderConfigurationStore]. Build-time
+ * Gradle values remain a fallback for managed releases. An explicit lock always wins over either
+ * source, while resetting returns the provider to its build-time/default state.
+ */
+@Singleton
+class RuntimeProviderConfigurationSource @Inject constructor(
+    private val buildConfig: BuildConfigProviderConfigurationSource,
+    private val secureStore: SecureProviderConfigurationStore,
+) : ProviderConfigurationSource {
+    override fun value(key: ProviderConfigKey): String =
+        secureStore.value(key).ifBlank { buildConfig.value(key) }
+
+    fun isUnlocked(id: IntegrationId): Boolean {
+        secureStore.explicitUnlockState(id)?.let { return it }
+        if (id == IntegrationId.OFFICIAL_YOUTUBE) return true
+        val required = ProviderDefinitions.all.first { it.id == id }.requiredConfiguration
+        return required.isNotEmpty() && missing(required).isEmpty()
+    }
+
+    fun unlock(
+        id: IntegrationId,
+        suppliedValues: Map<ProviderConfigKey, String> = emptyMap(),
+    ): Result<Unit> = secureStore.unlock(id, suppliedValues, buildConfig)
+
+    fun lock(id: IntegrationId) = secureStore.lock(id)
+
+    fun reset(id: IntegrationId) = secureStore.reset(id)
+
+    fun hasCompleteConfiguration(id: IntegrationId): Boolean {
+        val required = ProviderDefinitions.all.first { it.id == id }.requiredConfiguration
+        return missing(required).isEmpty()
+    }
 }
