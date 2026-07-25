@@ -5,7 +5,7 @@ import org.junit.Test
 
 class ProviderConfigurationValidatorTest {
     @Test
-    fun `accepts secure provider endpoints and public identifiers`() {
+    fun `accepts secure endpoints public identifiers and registered callbacks`() {
         ProviderConfigurationValidator.validate(
             ProviderConfigKey.SPOTIFY_CLIENT_ID,
             "0123456789abcdef0123456789abcdef",
@@ -13,6 +13,18 @@ class ProviderConfigurationValidatorTest {
         ProviderConfigurationValidator.validate(
             ProviderConfigKey.SPOTIFY_REDIRECT_URI,
             "https://music.example.com/oauth/spotify",
+        )
+        ProviderConfigurationValidator.validate(
+            ProviderConfigKey.SPOTIFY_REDIRECT_URI,
+            "rockmusic://oauth/spotify",
+        )
+        ProviderConfigurationValidator.validate(
+            ProviderConfigKey.DISCORD_REDIRECT_URI,
+            "rockmusic://oauth/discord",
+        )
+        ProviderConfigurationValidator.validate(
+            ProviderConfigKey.CLOUD_REDIRECT_URI,
+            "rockmusic://oauth/cloud",
         )
         ProviderConfigurationValidator.validate(
             ProviderConfigKey.LISTEN_TOGETHER_WS_URL,
@@ -25,12 +37,20 @@ class ProviderConfigurationValidatorTest {
     }
 
     @Test
-    fun `rejects insecure redirect backend and websocket routes`() {
+    fun `rejects insecure or mismatched redirect backend and websocket routes`() {
         assertTrue(
             runCatching {
                 ProviderConfigurationValidator.validate(
                     ProviderConfigKey.SPOTIFY_REDIRECT_URI,
                     "http://example.com/callback",
+                )
+            }.isFailure,
+        )
+        assertTrue(
+            runCatching {
+                ProviderConfigurationValidator.validate(
+                    ProviderConfigKey.SPOTIFY_REDIRECT_URI,
+                    "rockmusic://oauth/discord",
                 )
             }.isFailure,
         )
