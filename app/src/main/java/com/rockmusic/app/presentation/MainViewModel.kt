@@ -12,11 +12,11 @@ import com.rockmusic.app.domain.policy.MediaOperation
 import com.rockmusic.app.domain.policy.MediaOrigin
 import com.rockmusic.app.player.PlayerConnection
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -35,62 +35,132 @@ class MainViewModel @Inject constructor(
     fun loadLocalMusic() {
         if (_libraryState.value.isLoading) return
         viewModelScope.launch {
-            _libraryState.value = _libraryState.value.copy(isLoading = true, error = null)
+            _libraryState.value = _libraryState.value.copy(
+                isLoading = true,
+                error = null,
+                statusMessage = "Scanning songs on this phone…",
+            )
             _libraryState.value = runCatching { localMusicRepository.scan() }
                 .fold(
                     onSuccess = { scanned ->
-                        val selected = _libraryState.value.tracks.filter { it.id < 0L }
+                        val merged = mergeTracks(_libraryState.value.tracks, scanned)
                         LocalLibraryState(
-                            tracks = (selected + scanned).distinctBy(LocalTrack::mediaUri),
+                            tracks = merged,
+                            statusMessage = "Found ${scanned.size} songs on this phone.",
                         )
                     },
                     onFailure = {
                         _libraryState.value.copy(
                             isLoading = false,
                             error = it.message ?: "Unable to scan local music",
+                            statusMessage = null,
                         )
                     },
                 )
         }
     }
 
-    fun openDownloadedAudio(uri: Uri) {
-        if (_libraryState.value.isImporting) return
+    fun addAllSongs(autoPlay: Boolean = true) {
+        if (_libraryState.value.isLoading || _libraryState.value.isImporting) return
         viewModelScope.launch {
-            _libraryState.value = _libraryState.value.copy(isImporting = true, error = null)
-            runCatching { localMusicRepository.resolve(uri) }
-                .onSuccess { track ->
+            _libraryState.value = _libraryState.value.copy(
+                isLoading = true,
+                error = null,
+                statusMessage = "Scanning and adding all songs…",
+            )
+            runCatching { localMusicRepository.scan() }
+                .onSuccess { scanned ->
                     _libraryState.value = _libraryState.value.copy(
-                        tracks = listOf(track) + _libraryState.value.tracks.filterNot {
-                            it.mediaUri == track.mediaUri
-                        },
+                        tracks = mergeTracks(_libraryState.value.tracks, scanned),
+                        isLoading = false,
+                        error = null,
+                        statusMessage = "Added ${scanned.size} songs.",
+                    )
+                    if (autoPlay) playAll(scanned)
+                }
+                .onFailure {
+                    _libraryState.value = _libraryState.value.copy(
+                        isLoading = false,
+                        error = it.message ?: "Unable to add songs from this phone",
+                        statusMessage = null,
+                    )
+                }
+        }
+    }
+
+    fun openDownloadedAudio(uri: Uri) {
+        addDownloadedAudio(listOf(uri), autoPlay = true)
+    }
+
+    fun addDownloadedAudio(uris: List<Uri>, autoPlay: Boolean = true) {
+        if (uris.isEmpty() || _libraryState.value.isImporting) return
+        viewModelScope.launch {
+            _libraryState.value = _libraryState.value.copy(
+                isImporting = true,
+                error = null,
+                statusMessage = "Opening ${uris.size} audio file${if (uris.size == 1) "" else "s"}…",
+            )
+            runCatching { localMusicRepository.resolveAll(uris) }
+                .onSuccess { imported ->
+                    _libraryState.value = _libraryState.value.copy(
+                        tracks = mergeTracks(_libraryState.value.tracks, imported),
                         isImporting = false,
                         error = null,
+                        statusMessage = "Added ${imported.size} downloaded song${if (imported.size == 1) "" else "s"}.",
                     )
-                    play(track)
+                    if (autoPlay) playAll(imported)
                 }
                 .onFailure {
                     _libraryState.value = _libraryState.value.copy(
                         isImporting = false,
-                        error = it.message ?: "Unable to open the downloaded audio file",
+                        error = it.message ?: "Unable to open the downloaded audio files",
+                        statusMessage = null,
+                    )
+                }
+        }
+    }
+
+    fun openSongFolder(treeUri: Uri, autoPlay: Boolean = true) {
+        if (_libraryState.value.isImporting) return
+        viewModelScope.launch {
+            _libraryState.value = _libraryState.value.copy(
+                isImporting = true,
+                error = null,
+                statusMessage = "Scanning the selected song folder…",
+            )
+            runCatching { localMusicRepository.scanFolder(treeUri) }
+                .onSuccess { imported ->
+                    _libraryState.value = _libraryState.value.copy(
+                        tracks = mergeTracks(_libraryState.value.tracks, imported),
+                        isImporting = false,
+                        error = null,
+                        statusMessage = "Added ${imported.size} songs from the selected folder.",
+                    )
+                    if (autoPlay) playAll(imported)
+                }
+                .onFailure {
+                    _libraryState.value = _libraryState.value.copy(
+                        isImporting = false,
+                        error = it.message ?: "Unable to scan the selected song folder",
+                        statusMessage = null,
                     )
                 }
         }
     }
 
     fun play(track: LocalTrack) {
-        val decision = mediaActionPolicy.decide(
-            MediaActionRequest(
-                operation = MediaOperation.PLAY,
-                origin = MediaOrigin.LOCAL_FILE,
-                mediaId = track.id.toString(),
-                sourceUri = track.mediaUri,
-            ),
-        )
-        _lastActionDecision.value = decision
+        playAll(listOf(track))
+    }
 
-        if (decision == MediaActionDecision.ExecuteInApp) {
-            playerConnection.play(track)
+    fun playAll(tracks: List<LocalTrack>) {
+        val approvedTracks = tracks.distinctBy(LocalTrack::mediaUri).filter { track ->
+            val decision = mediaActionPolicy.decide(track.toPlayRequest())
+            _lastActionDecision.value = decision
+            decision == MediaActionDecision.ExecuteInApp
+        }
+
+        if (approvedTracks.isNotEmpty()) {
+            playerConnection.playQueue(approvedTracks)
         }
     }
 
@@ -99,6 +169,18 @@ class MainViewModel @Inject constructor(
     fun skipNext() = playerConnection.skipNext()
     fun skipPrevious() = playerConnection.skipPrevious()
     fun clearPlayerError() = playerConnection.clearError()
+
+    private fun LocalTrack.toPlayRequest() = MediaActionRequest(
+        operation = MediaOperation.PLAY,
+        origin = MediaOrigin.LOCAL_FILE,
+        mediaId = id.toString(),
+        sourceUri = mediaUri,
+    )
+
+    private fun mergeTracks(
+        existing: List<LocalTrack>,
+        incoming: List<LocalTrack>,
+    ): List<LocalTrack> = (incoming + existing).distinctBy(LocalTrack::mediaUri)
 }
 
 data class LocalLibraryState(
@@ -106,4 +188,5 @@ data class LocalLibraryState(
     val isLoading: Boolean = false,
     val isImporting: Boolean = false,
     val error: String? = null,
+    val statusMessage: String? = null,
 )
