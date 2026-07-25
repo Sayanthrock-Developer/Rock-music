@@ -23,11 +23,16 @@ data class IntegrationSnapshot(
 @Singleton
 class IntegrationRegistry @Inject constructor(
     private val configuration: RuntimeProviderConfigurationSource,
+    private val authorizationStore: IntegrationAuthorizationStore,
 ) {
     private val definitions = ProviderDefinitions.all.associateBy(IntegrationDefinition::id)
     private val gateways: Map<IntegrationId, ConfiguredProviderGateway> =
         ProviderDefinitions.all.associate { definition ->
-            definition.id to ConfiguredProviderGateway(definition, configuration)
+            definition.id to ConfiguredProviderGateway(
+                definition = definition,
+                configuration = configuration,
+                authorizationStore = authorizationStore,
+            )
         }
 
     fun gateway(id: IntegrationId): IntegrationGateway =
@@ -40,7 +45,10 @@ class IntegrationRegistry @Inject constructor(
 
     fun lock(id: IntegrationId) = configuration.lock(id)
 
-    fun reset(id: IntegrationId) = configuration.reset(id)
+    fun reset(id: IntegrationId) {
+        configuration.reset(id)
+        authorizationStore.clear(id)
+    }
 
     suspend fun snapshots(): List<IntegrationSnapshot> =
         ProviderDefinitions.all.map { definition ->
@@ -64,6 +72,7 @@ class IntegrationRegistry @Inject constructor(
 private class ConfiguredProviderGateway(
     private val definition: IntegrationDefinition,
     private val configuration: RuntimeProviderConfigurationSource,
+    private val authorizationStore: IntegrationAuthorizationStore,
 ) : IntegrationGateway {
     override val id: IntegrationId = definition.id
 
@@ -74,7 +83,10 @@ private class ConfiguredProviderGateway(
         val missing = configuration.missing(definition.requiredConfiguration)
         return when {
             missing.isNotEmpty() -> IntegrationAvailability.Unconfigured(missing)
-            definition.requiresUserAuthentication -> IntegrationAvailability.AuthenticationRequired
+            definition.requiresUserAuthentication &&
+                !authorizationStore.isAuthorized(definition.id) ->
+                IntegrationAvailability.AuthenticationRequired
+
             else -> IntegrationAvailability.Available
         }
     }
