@@ -176,6 +176,7 @@ class MainViewModel @Inject constructor(
     }
 
     private fun launchOfficialRoute(result: ProviderCallResult<OfficialProviderRoute>) {
+        if (_youTubeState.value.isLaunching) return
         _youTubeState.value = YouTubeHomeState(isLaunching = true)
         when (result) {
             is ProviderCallResult.Success -> {
