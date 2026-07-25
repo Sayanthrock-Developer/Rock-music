@@ -29,6 +29,7 @@
 ## Phase 2 — Local music and library
 
 - [x] Folder browsing and exclusion
+- [x] Unified Home with every imported/scanned song, featured carousel, Speed Dial, and library search
 - [ ] Embedded artwork and metadata editing
 - [ ] Duplicate detection
 - [ ] Playlists, favourites, history, sorting, filtering, folders, and bulk selection
@@ -74,14 +75,16 @@
 - [x] Licensed catalogue configuration, capabilities, and typed service contract
 - [ ] Real licensed catalogue client with per-item entitlement checks
 - [x] Official YouTube/YouTube Music handoff definition with no in-app protected streaming capability
-- [ ] Official Android intent/deep-link builder and device-resolution tests
+- [x] Validated Android intent/deep-link launch planner with official-package priority and HTTPS fallback
+- [ ] Device-resolution instrumentation tests across YouTube and YouTube Music installations
 - [x] User-authorised cloud storage configuration and typed service contract
 - [ ] Real cloud OAuth and file-access client
 - [x] Discord configuration and typed activity-sharing contract
 - [ ] Real Discord connection through an official supported SDK/API
 - [x] Public client-ID, redirect-URI, endpoint and publishable-key build configuration; no private mobile secrets
 - [x] Explicit unconfigured, authentication-required, offline, unsupported, and error state model
-- [ ] Route catalogue playback, official handoff, cloud downloads, sharing, and Discord activity through `MediaActionPolicyEngine`
+- [x] Route official YouTube handoff through `MediaActionPolicyEngine`
+- [ ] Route catalogue playback, cloud downloads, sharing, and Discord activity through `MediaActionPolicyEngine`
 - [ ] Loading, empty, offline, error, retry, accessibility, unit-test, and UI-test coverage
 
 ## Phase 6 — Echo Find and Listen Together
