@@ -28,7 +28,7 @@ class SpotifyPlaylistReferenceParserTest {
     }
 
     @Test
-    fun `rejects non playlist and non Spotify links`() {
+    fun `rejects non playlist non Spotify and insecure links`() {
         assertTrue(
             SpotifyPlaylistReferenceParser.parse(
                 "https://open.spotify.com/track/25Y5z4jvx8H5UHUFxSY95g",
@@ -44,13 +44,23 @@ class SpotifyPlaylistReferenceParserTest {
                 "http://open.spotify.com/playlist/25Y5z4jvx8H5UHUFxSY95g",
             ).isFailure,
         )
+        assertTrue(
+            SpotifyPlaylistReferenceParser.parse(
+                "https://open.spotify.com:444/playlist/25Y5z4jvx8H5UHUFxSY95g",
+            ).isFailure,
+        )
     }
 
     @Test
-    fun `rejects malformed playlist ids`() {
+    fun `rejects malformed playlist ids and extended Spotify URIs`() {
         assertTrue(
             SpotifyPlaylistReferenceParser.parse(
                 "spotify:playlist:not-a-valid-id",
+            ).isFailure,
+        )
+        assertTrue(
+            SpotifyPlaylistReferenceParser.parse(
+                "spotify:playlist:ignored:25Y5z4jvx8H5UHUFxSY95g",
             ).isFailure,
         )
     }
