@@ -23,4 +23,9 @@ class LocalMusicFolderIdentityTest {
         assertEquals("Downloads", LocalMusicFolderIdentity.displayName("Music/Downloads/"))
         assertEquals("Music/Downloads", LocalMusicFolderIdentity.displayPath("Music/Downloads/"))
     }
+
+    @Test
+    fun `keeps a top-level folder name`() {
+        assertEquals("Music", LocalMusicFolderIdentity.displayName("Music/"))
+    }
 }
