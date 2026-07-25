@@ -50,7 +50,7 @@ class PlayerConnection @Inject constructor(
             _state.value = _state.value.copy(
                 isPreparing = false,
                 errorMessage = error.localizedMessage
-                    ?: "This audio file could not be played (${error.errorCodeName}).",
+                    ?: "This audio file could not be played (code ${error.errorCode}).",
             )
         }
     }
@@ -164,18 +164,20 @@ class PlayerConnection @Inject constructor(
     }
 
     private fun publish(player: Player) {
+        val currentState = _state.value
         val metadata = player.currentMediaItem?.mediaMetadata
-        _state.value = _state.value.copy(
-            title = metadata?.title?.toString() ?: _state.value.title,
-            artist = metadata?.artist?.toString() ?: _state.value.artist,
-            album = metadata?.albumTitle?.toString() ?: _state.value.album,
-            artworkUri = metadata?.artworkUri?.toString() ?: _state.value.artworkUri,
+        _state.value = currentState.copy(
+            title = metadata?.title?.toString() ?: currentState.title,
+            artist = metadata?.artist?.toString() ?: currentState.artist,
+            album = metadata?.albumTitle?.toString() ?: currentState.album,
+            artworkUri = metadata?.artworkUri?.toString() ?: currentState.artworkUri,
             isPlaying = player.isPlaying,
             isPreparing = player.playbackState == Player.STATE_BUFFERING,
             positionMs = player.currentPosition.coerceAtLeast(0L),
             durationMs = player.duration.takeIf { it > 0 } ?: 0L,
             hasNext = player.hasNextMediaItem(),
             hasPrevious = player.hasPreviousMediaItem(),
+            errorMessage = currentState.errorMessage,
         )
     }
 }
