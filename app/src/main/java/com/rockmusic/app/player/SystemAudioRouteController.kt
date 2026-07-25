@@ -12,17 +12,18 @@ import javax.inject.Singleton
 class SystemAudioRouteController @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    private val router = context.getSystemService(Context.MEDIA_ROUTER_SERVICE) as MediaRouter
+    private val router = context.getSystemService(Context.MEDIA_ROUTER_SERVICE) as? MediaRouter
     private val idsByRoute = IdentityHashMap<MediaRouter.RouteInfo, Int>()
     private val routesById = mutableMapOf<Int, MediaRouter.RouteInfo>()
     private var nextRouteId = 1
 
     @Synchronized
     fun routes(): List<SystemAudioRoute> {
-        val selected = router.getSelectedRoute(MediaRouter.ROUTE_TYPE_LIVE_AUDIO)
+        val mediaRouter = router ?: return emptyList()
+        val selected = mediaRouter.getSelectedRoute(MediaRouter.ROUTE_TYPE_LIVE_AUDIO)
         val currentRoutes = buildList {
-            for (routerIndex in 0 until router.routeCount) {
-                val route = router.getRouteAt(routerIndex)
+            for (routerIndex in 0 until mediaRouter.routeCount) {
+                val route = mediaRouter.getRouteAt(routerIndex)
                 if (route.supportedTypes and MediaRouter.ROUTE_TYPE_LIVE_AUDIO != 0) add(route)
             }
         }
@@ -51,16 +52,17 @@ class SystemAudioRouteController @Inject constructor(
 
     @Synchronized
     fun select(index: Int): Result<Unit> = runCatching {
+        val mediaRouter = router ?: error("Audio output routing is unavailable on this device")
         val route = routesById[index]
             ?: error("The selected audio route is no longer available")
-        val isStillAvailable = (0 until router.routeCount)
-            .any { routerIndex -> router.getRouteAt(routerIndex) === route }
+        val isStillAvailable = (0 until mediaRouter.routeCount)
+            .any { routerIndex -> mediaRouter.getRouteAt(routerIndex) === route }
         require(isStillAvailable) { "The selected audio route is no longer available" }
         require(route.isEnabled) { "The selected audio route is disabled" }
         require(route.supportedTypes and MediaRouter.ROUTE_TYPE_LIVE_AUDIO != 0) {
             "The selected route does not support audio"
         }
-        router.selectRoute(MediaRouter.ROUTE_TYPE_LIVE_AUDIO, route)
+        mediaRouter.selectRoute(MediaRouter.ROUTE_TYPE_LIVE_AUDIO, route)
     }
 }
 
