@@ -2,6 +2,8 @@ package com.rockmusic.app.presentation.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.BlurOn
@@ -50,6 +54,7 @@ fun AppearanceScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .verticalScroll(rememberScrollState())
             .padding(PaddingValues(horizontal = 20.dp, vertical = 28.dp)),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
@@ -155,7 +160,7 @@ private fun SettingToggle(
                     modifier = Modifier.padding(12.dp),
                 )
             }
-            Spacer(Modifier.padding(horizontal = 6.dp))
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, fontWeight = FontWeight.Bold)
                 Text(
@@ -212,7 +217,9 @@ private fun AppearancePreview(useBlurFrames: Boolean) {
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.height(54.dp).weight(0.22f),
+                    modifier = Modifier
+                        .height(54.dp)
+                        .weight(0.22f),
                 ) {}
                 Column(
                     modifier = Modifier
