@@ -3,6 +3,7 @@ package com.rockmusic.app.player
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
+import android.os.Bundle
 import androidx.core.content.ContextCompat
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -30,15 +31,21 @@ class PlayerConnection @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val favouriteStore = FavouriteStore(context)
     private var controller: MediaController? = null
     private var pendingQueue: PendingQueue? = null
+    private var pendingVolume: Float? = null
 
     private val _state = MutableStateFlow(PlayerUiState())
     val state: StateFlow<PlayerUiState> = _state.asStateFlow()
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
-            publish(player)
+            publish(
+                player,
+                includeQueue = events.contains(Player.EVENT_TIMELINE_CHANGED) ||
+                    events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION),
+            )
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -65,12 +72,18 @@ class PlayerConnection @Inject constructor(
                     .onSuccess { mediaController ->
                         controller = mediaController
                         mediaController.addListener(listener)
-                        publish(mediaController)
-                        startPositionUpdates()
-                        pendingQueue?.let { queue ->
+                        pendingVolume?.let { requestedVolume ->
+                            mediaController.volume = requestedVolume
+                            pendingVolume = null
+                        }
+                        val queue = pendingQueue
+                        if (queue == null) {
+                            publish(mediaController, includeQueue = true)
+                        } else {
                             pendingQueue = null
                             startPlayback(mediaController, queue.tracks, queue.startIndex)
                         }
+                        startPositionUpdates()
                     }
                     .onFailure { error ->
                         _state.value = _state.value.copy(
@@ -103,11 +116,7 @@ class PlayerConnection @Inject constructor(
 
     fun togglePlayPause() {
         controller?.let { mediaController ->
-            if (mediaController.isPlaying) {
-                mediaController.pause()
-            } else {
-                mediaController.play()
-            }
+            if (mediaController.isPlaying) mediaController.pause() else mediaController.play()
         }
     }
 
@@ -121,6 +130,29 @@ class PlayerConnection @Inject constructor(
 
     fun skipPrevious() {
         controller?.seekToPreviousMediaItem()
+    }
+
+    fun playQueueIndex(index: Int) {
+        controller?.let { mediaController ->
+            if (index !in 0 until mediaController.mediaItemCount) return
+            mediaController.seekToDefaultPosition(index)
+            mediaController.play()
+        }
+    }
+
+    fun setVolume(volume: Float) {
+        val safeVolume = volume.coerceIn(0f, 1f)
+        _state.value = _state.value.copy(volume = safeVolume)
+        val mediaController = controller
+        if (mediaController == null) {
+            pendingVolume = safeVolume
+        } else {
+            mediaController.volume = safeVolume
+        }
+    }
+
+    fun toggleFavourite() {
+        controller?.sendCustomCommand(MediaSessionCommands.toggleFavourite, Bundle.EMPTY)
     }
 
     fun clearError() {
@@ -140,15 +172,23 @@ class PlayerConnection @Inject constructor(
     }
 
     private fun toMediaItem(track: LocalTrack): MediaItem {
+        val mediaId = "local:${track.id}"
+        val extras = Bundle().apply {
+            putBoolean(
+                MediaSessionCommands.METADATA_IS_FAVOURITE,
+                favouriteStore.isFavourite(mediaId),
+            )
+        }
         val builder = MediaItem.Builder()
             .setUri(Uri.parse(track.mediaUri))
-            .setMediaId("local:${track.id}")
+            .setMediaId(mediaId)
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(track.title)
                     .setArtist(track.artist)
                     .setAlbumTitle(track.album)
                     .setArtworkUri(track.artworkUri?.let(Uri::parse))
+                    .setExtras(extras)
                     .build(),
             )
         track.mimeType
@@ -162,6 +202,7 @@ class PlayerConnection @Inject constructor(
             title = track.title,
             artist = track.artist,
             album = track.album,
+            mediaUri = track.mediaUri,
             artworkUri = track.artworkUri,
             isPreparing = true,
             errorMessage = null,
@@ -171,28 +212,59 @@ class PlayerConnection @Inject constructor(
     private fun startPositionUpdates() {
         scope.launch {
             while (isActive) {
-                controller?.let(::publish)
+                controller?.let { publish(it, includeQueue = false) }
                 delay(500)
             }
         }
     }
 
-    private fun publish(player: Player) {
+    private fun publish(player: Player, includeQueue: Boolean) {
         val currentState = _state.value
-        val metadata = player.currentMediaItem?.mediaMetadata
+        val mediaItem = player.currentMediaItem
+        if (mediaItem == null) {
+            _state.value = PlayerUiState(
+                volume = player.volume.coerceIn(0f, 1f),
+                queue = if (includeQueue) queueSnapshot(player) else emptyList(),
+                errorMessage = currentState.errorMessage,
+            )
+            return
+        }
+
+        val metadata = mediaItem.mediaMetadata
         _state.value = currentState.copy(
-            title = metadata?.title?.toString() ?: currentState.title,
-            artist = metadata?.artist?.toString() ?: currentState.artist,
-            album = metadata?.albumTitle?.toString() ?: currentState.album,
-            artworkUri = metadata?.artworkUri?.toString() ?: currentState.artworkUri,
+            title = metadata.title?.toString(),
+            artist = metadata.artist?.toString(),
+            album = metadata.albumTitle?.toString(),
+            mediaUri = mediaItem.localConfiguration?.uri?.toString(),
+            artworkUri = metadata.artworkUri?.toString(),
+            isFavourite = metadata.extras
+                ?.getBoolean(MediaSessionCommands.METADATA_IS_FAVOURITE, false)
+                ?: false,
             isPlaying = player.isPlaying,
             isPreparing = player.playbackState == Player.STATE_BUFFERING,
             positionMs = player.currentPosition.coerceAtLeast(0L),
             durationMs = player.duration.takeIf { it > 0 } ?: 0L,
             hasNext = player.hasNextMediaItem(),
             hasPrevious = player.hasPreviousMediaItem(),
+            volume = player.volume.coerceIn(0f, 1f),
+            currentQueueIndex = player.currentMediaItemIndex.coerceAtLeast(0),
+            queue = if (includeQueue) queueSnapshot(player) else currentState.queue,
             errorMessage = currentState.errorMessage,
         )
+    }
+
+    private fun queueSnapshot(player: Player): List<PlayerQueueItem> = buildList {
+        for (index in 0 until player.mediaItemCount) {
+            val item = player.getMediaItemAt(index)
+            add(
+                PlayerQueueItem(
+                    mediaId = item.mediaId,
+                    title = item.mediaMetadata.title?.toString().orEmpty().ifBlank { "Unknown title" },
+                    artist = item.mediaMetadata.artist?.toString().orEmpty().ifBlank { "Unknown artist" },
+                    artworkUri = item.mediaMetadata.artworkUri?.toString(),
+                ),
+            )
+        }
     }
 
     private data class PendingQueue(
@@ -201,17 +273,29 @@ class PlayerConnection @Inject constructor(
     )
 }
 
+data class PlayerQueueItem(
+    val mediaId: String,
+    val title: String,
+    val artist: String,
+    val artworkUri: String?,
+)
+
 data class PlayerUiState(
     val title: String? = null,
     val artist: String? = null,
     val album: String? = null,
+    val mediaUri: String? = null,
     val artworkUri: String? = null,
+    val isFavourite: Boolean = false,
     val isPlaying: Boolean = false,
     val isPreparing: Boolean = false,
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
     val hasNext: Boolean = false,
     val hasPrevious: Boolean = false,
+    val volume: Float = 1f,
+    val queue: List<PlayerQueueItem> = emptyList(),
+    val currentQueueIndex: Int = 0,
     val errorMessage: String? = null,
 ) {
     val hasMedia: Boolean get() = title != null
