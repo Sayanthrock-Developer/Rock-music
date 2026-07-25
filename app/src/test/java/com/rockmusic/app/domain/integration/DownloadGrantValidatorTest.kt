@@ -9,7 +9,7 @@ class DownloadGrantValidatorTest {
 
     @Test
     fun `accepts an item matched unexpired HTTPS grant`() {
-        val grant = grant(permission = DownloadPermission(permitted = true))
+        val grant = grant(permission = DownloadGrantPermission(permitted = true))
 
         assertEquals(
             DownloadGrantValidation.Valid,
@@ -20,7 +20,7 @@ class DownloadGrantValidatorTest {
     @Test
     fun `denies by default when provider permission is absent`() {
         val result = DownloadGrantValidator.validate(
-            grant = grant(permission = DownloadPermission(permitted = false, reason = "Not entitled")),
+            grant = grant(permission = DownloadGrantPermission(permitted = false, reason = "Not entitled")),
             item = item,
             nowEpochMs = 1_500L,
         )
@@ -34,7 +34,7 @@ class DownloadGrantValidatorTest {
         assertEquals(
             DownloadGrantValidation.Expired,
             DownloadGrantValidator.validate(
-                grant(permission = DownloadPermission(permitted = true), expiresAt = 1_500L),
+                grant(DownloadGrantPermission(permitted = true), expiresAt = 1_500L),
                 item,
                 nowEpochMs = 1_500L,
             ),
@@ -42,7 +42,7 @@ class DownloadGrantValidatorTest {
         assertEquals(
             DownloadGrantValidation.ItemMismatch,
             DownloadGrantValidator.validate(
-                grant(permission = DownloadPermission(permitted = true)),
+                grant(DownloadGrantPermission(permitted = true)),
                 item.copy(mediaId = "other"),
                 nowEpochMs = 1_500L,
             ),
@@ -51,7 +51,7 @@ class DownloadGrantValidatorTest {
             DownloadGrantValidation.InvalidTransport,
             DownloadGrantValidator.validate(
                 grant(
-                    permission = DownloadPermission(permitted = true),
+                    permission = DownloadGrantPermission(permitted = true),
                     downloadUrl = "http://example.com/track.mp3",
                 ),
                 item,
@@ -64,7 +64,7 @@ class DownloadGrantValidatorTest {
     fun `rejects malformed SHA256 metadata`() {
         val result = DownloadGrantValidator.validate(
             grant = grant(
-                permission = DownloadPermission(permitted = true),
+                permission = DownloadGrantPermission(permitted = true),
                 expectedSha256 = "not-a-sha256",
             ),
             item = item,
@@ -74,14 +74,30 @@ class DownloadGrantValidatorTest {
         assertEquals(DownloadGrantValidation.InvalidDigest, result)
     }
 
+    @Test
+    fun `rejects blank provider identity even when item identity is blank`() {
+        val blankItem = item.copy(providerId = "")
+        val result = DownloadGrantValidator.validate(
+            grant = grant(
+                permission = DownloadGrantPermission(permitted = true),
+                providerId = "",
+            ),
+            item = blankItem,
+            nowEpochMs = 1_500L,
+        )
+
+        assertEquals(DownloadGrantValidation.ItemMismatch, result)
+    }
+
     private fun grant(
-        permission: DownloadPermission,
+        permission: DownloadGrantPermission,
         expiresAt: Long = 2_000L,
         downloadUrl: String = "https://downloads.example.com/track.mp3",
         expectedSha256: String? = null,
+        providerId: String = item.providerId,
     ) = DownloadGrant(
         mediaId = item.mediaId,
-        providerId = item.providerId,
+        providerId = providerId,
         grantId = "grant-1",
         downloadUrl = downloadUrl,
         issuedAtEpochMs = 1_000L,
