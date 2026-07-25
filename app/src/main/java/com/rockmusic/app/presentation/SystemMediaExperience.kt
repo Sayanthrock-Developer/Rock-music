@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,10 +15,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
@@ -47,7 +49,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -248,7 +249,7 @@ private fun SystemPlayerCard(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            contentPadding = PaddingValues(
                 start = 20.dp,
                 end = 20.dp,
                 top = 18.dp,
@@ -347,7 +348,10 @@ private fun SystemPlayerCard(
                                 modifier = Modifier.size(70.dp),
                             ) {
                                 if (player.isPreparing) {
-                                    CircularProgressIndicator(Modifier.size(30.dp), strokeWidth = 3.dp)
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(30.dp),
+                                        strokeWidth = 3.dp,
+                                    )
                                 } else {
                                     Icon(
                                         if (player.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
@@ -373,7 +377,9 @@ private fun SystemPlayerCard(
                                 value = player.volume,
                                 onValueChange = onVolume,
                                 valueRange = 0f..1f,
-                                modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(horizontal = 10.dp),
                             )
                             Icon(Icons.Rounded.VolumeUp, contentDescription = null)
                         }
@@ -382,11 +388,11 @@ private fun SystemPlayerCard(
             }
 
             item {
-                Row(
+                LazyRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    SystemPlayerPanel.entries.forEach { panel ->
+                    items(SystemPlayerPanel.entries, key = SystemPlayerPanel::name) { panel ->
                         FilterChip(
                             selected = selectedPanel == panel,
                             onClick = { onPanelSelected(panel) },
@@ -453,18 +459,24 @@ private fun QueuePanel(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             SystemArtwork(
-                                item.artworkUri,
-                                item.title,
-                                Modifier.size(48.dp),
-                                RoundedCornerShape(14.dp),
+                                artworkUri = item.artworkUri,
+                                title = item.title,
+                                modifier = Modifier.size(48.dp),
+                                shape = RoundedCornerShape(14.dp),
                             )
                             Spacer(Modifier.width(10.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(item.title, fontWeight = FontWeight.Bold, maxLines = 1)
+                                Text(
+                                    item.title,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                                 Text(
                                     item.artist,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
                             if (index == currentIndex) {
@@ -489,6 +501,7 @@ private fun LyricsPanel(state: LyricsUiState) {
                     Spacer(Modifier.width(10.dp))
                     Text("Reading lyrics from this audio file…")
                 }
+
                 state.error != null -> Text(state.error, color = MaterialTheme.colorScheme.error)
                 state.lyrics != null -> Text(state.lyrics)
                 else -> Text(state.message ?: "Open Lyrics to read embedded local lyrics.")
@@ -582,6 +595,6 @@ private fun SystemArtwork(
 }
 
 private fun systemDuration(valueMs: Long): String {
-    val totalSeconds = (valueMs.coerceAtLeast(0L) / 1_000L)
+    val totalSeconds = valueMs.coerceAtLeast(0L) / 1_000L
     return "%d:%02d".format(totalSeconds / 60L, totalSeconds % 60L)
 }
