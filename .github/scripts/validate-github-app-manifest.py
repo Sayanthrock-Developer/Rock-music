@@ -29,7 +29,10 @@ FORBIDDEN_SECRET_MARKERS = (
     "-----BEGIN RSA PRIVATE KEY-----",
     "github_pat_",
     "ghp_",
+    "gho_",
+    "ghu_",
     "ghs_",
+    "ghr_",
 )
 FORBIDDEN_KEYS = {
     "private_key",
