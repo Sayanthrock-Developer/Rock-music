@@ -10,6 +10,9 @@ object MediaSessionCommands {
     const val SURFACE_LYRICS = "lyrics"
     const val METADATA_IS_FAVOURITE = "com.rockmusic.app.metadata.IS_FAVOURITE"
 
-    val toggleFavourite = SessionCommand(ACTION_TOGGLE_FAVOURITE, Bundle.EMPTY)
-    val openLyrics = SessionCommand(ACTION_OPEN_LYRICS, Bundle.EMPTY)
+    val toggleFavourite: SessionCommand
+        get() = SessionCommand(ACTION_TOGGLE_FAVOURITE, Bundle.EMPTY)
+
+    val openLyrics: SessionCommand
+        get() = SessionCommand(ACTION_OPEN_LYRICS, Bundle.EMPTY)
 }
