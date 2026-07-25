@@ -1,5 +1,8 @@
 package com.rockmusic.app
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -7,12 +10,18 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.rockmusic.app.presentation.FolderManagerScreen
 import com.rockmusic.app.presentation.SongManagerScreen
 import com.rockmusic.app.presentation.UnifiedMusicRoot
@@ -30,6 +39,20 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val appearancePreferences = remember { AppearancePreferences(applicationContext) }
+            val lifecycleOwner = LocalLifecycleOwner.current
+            val audioPermission = if (Build.VERSION.SDK_INT >= 33) {
+                Manifest.permission.READ_MEDIA_AUDIO
+            } else {
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            }
+            var audioPermissionGranted by remember {
+                mutableStateOf(
+                    ContextCompat.checkSelfPermission(
+                        applicationContext,
+                        audioPermission,
+                    ) == PackageManager.PERMISSION_GRANTED,
+                )
+            }
             var appearance by rememberSaveable(stateSaver = AppearanceSettingsSaver) {
                 mutableStateOf(appearancePreferences.load())
             }
@@ -37,6 +60,19 @@ class MainActivity : ComponentActivity() {
             var showAppearance by rememberSaveable { mutableStateOf(false) }
             var showSongManager by rememberSaveable { mutableStateOf(false) }
             var showFolderManager by rememberSaveable { mutableStateOf(false) }
+
+            DisposableEffect(lifecycleOwner, audioPermission) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) {
+                        audioPermissionGranted = ContextCompat.checkSelfPermission(
+                            applicationContext,
+                            audioPermission,
+                        ) == PackageManager.PERMISSION_GRANTED
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+            }
 
             RockMusicTheme(
                 mode = appearance.themeMode,
@@ -75,13 +111,15 @@ class MainActivity : ComponentActivity() {
                             onClose = { showConnections = false },
                         )
 
-                        else -> UnifiedMusicRoot(
-                            useBlurFrames = appearance.useBlurFrames,
-                            onOpenAppearance = { showAppearance = true },
-                            onOpenConnections = { showConnections = true },
-                            onOpenSongManager = { showSongManager = true },
-                            onOpenFolderManager = { showFolderManager = true },
-                        )
+                        else -> key(audioPermissionGranted) {
+                            UnifiedMusicRoot(
+                                useBlurFrames = appearance.useBlurFrames,
+                                onOpenAppearance = { showAppearance = true },
+                                onOpenConnections = { showConnections = true },
+                                onOpenSongManager = { showSongManager = true },
+                                onOpenFolderManager = { showFolderManager = true },
+                            )
+                        }
                     }
                 }
             }
