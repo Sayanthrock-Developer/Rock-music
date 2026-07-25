@@ -245,7 +245,15 @@ class MediaStoreLocalMusicRepository @Inject constructor(
             "No supported audio files were found in the selected folder."
         }
 
-        resolveAll(audioUris).sortedWith(
+        val tracks = runCatching { resolveAll(audioUris) }
+            .getOrElse { error ->
+                throw IllegalArgumentException(
+                    "The selected folder contains audio files, but none could be opened.",
+                    error,
+                )
+            }
+
+        tracks.sortedWith(
             compareBy<LocalTrack> { it.album.lowercase() }
                 .thenBy { it.title.lowercase() },
         )
