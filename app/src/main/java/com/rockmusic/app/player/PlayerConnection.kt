@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
 import androidx.core.content.ContextCompat
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
@@ -12,6 +13,8 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.rockmusic.app.domain.model.LocalTrack
 import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -21,8 +24,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import javax.inject.Inject
-import javax.inject.Singleton
 
 @Singleton
 class PlayerConnection @Inject constructor(
@@ -30,7 +31,7 @@ class PlayerConnection @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var controller: MediaController? = null
-    private var pendingTrack: LocalTrack? = null
+    private var pendingQueue: PendingQueue? = null
 
     private val _state = MutableStateFlow(PlayerUiState())
     val state: StateFlow<PlayerUiState> = _state.asStateFlow()
@@ -66,9 +67,9 @@ class PlayerConnection @Inject constructor(
                         mediaController.addListener(listener)
                         publish(mediaController)
                         startPositionUpdates()
-                        pendingTrack?.let { track ->
-                            pendingTrack = null
-                            startPlayback(mediaController, track)
+                        pendingQueue?.let { queue ->
+                            pendingQueue = null
+                            startPlayback(mediaController, queue.tracks, queue.startIndex)
                         }
                     }
                     .onFailure { error ->
@@ -83,20 +84,21 @@ class PlayerConnection @Inject constructor(
     }
 
     fun play(track: LocalTrack) {
+        playQueue(listOf(track))
+    }
+
+    fun playQueue(tracks: List<LocalTrack>, startIndex: Int = 0) {
+        val playableTracks = tracks.distinctBy(LocalTrack::mediaUri)
+        if (playableTracks.isEmpty()) return
+
+        val safeStartIndex = startIndex.coerceIn(playableTracks.indices)
         val mediaController = controller
         if (mediaController == null) {
-            pendingTrack = track
-            _state.value = _state.value.copy(
-                title = track.title,
-                artist = track.artist,
-                album = track.album,
-                artworkUri = track.artworkUri,
-                isPreparing = true,
-                errorMessage = null,
-            )
+            pendingQueue = PendingQueue(playableTracks, safeStartIndex)
+            publishPreparingTrack(playableTracks[safeStartIndex])
             return
         }
-        startPlayback(mediaController, track)
+        startPlayback(mediaController, playableTracks, safeStartIndex)
     }
 
     fun togglePlayPause() {
@@ -125,7 +127,19 @@ class PlayerConnection @Inject constructor(
         _state.value = _state.value.copy(errorMessage = null)
     }
 
-    private fun startPlayback(mediaController: MediaController, track: LocalTrack) {
+    private fun startPlayback(
+        mediaController: MediaController,
+        tracks: List<LocalTrack>,
+        startIndex: Int,
+    ) {
+        val items = tracks.map(::toMediaItem)
+        publishPreparingTrack(tracks[startIndex])
+        mediaController.setMediaItems(items, startIndex, C.TIME_UNSET)
+        mediaController.prepare()
+        mediaController.play()
+    }
+
+    private fun toMediaItem(track: LocalTrack): MediaItem {
         val builder = MediaItem.Builder()
             .setUri(Uri.parse(track.mediaUri))
             .setMediaId("local:${track.id}")
@@ -140,7 +154,10 @@ class PlayerConnection @Inject constructor(
         track.mimeType
             ?.takeIf(String::isNotBlank)
             ?.let(builder::setMimeType)
+        return builder.build()
+    }
 
+    private fun publishPreparingTrack(track: LocalTrack) {
         _state.value = _state.value.copy(
             title = track.title,
             artist = track.artist,
@@ -149,9 +166,6 @@ class PlayerConnection @Inject constructor(
             isPreparing = true,
             errorMessage = null,
         )
-        mediaController.setMediaItem(builder.build())
-        mediaController.prepare()
-        mediaController.play()
     }
 
     private fun startPositionUpdates() {
@@ -180,6 +194,11 @@ class PlayerConnection @Inject constructor(
             errorMessage = currentState.errorMessage,
         )
     }
+
+    private data class PendingQueue(
+        val tracks: List<LocalTrack>,
+        val startIndex: Int,
+    )
 }
 
 data class PlayerUiState(
