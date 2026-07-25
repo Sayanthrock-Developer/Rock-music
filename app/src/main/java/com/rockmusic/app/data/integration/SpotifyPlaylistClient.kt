@@ -17,6 +17,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 
 /** A safe, display-only projection of a Spotify playlist. Playback remains in Spotify. */
 data class SpotifyPlaylistPreview(
@@ -106,9 +107,7 @@ class SpotifyPlaylistClient @Inject constructor(
 
             firstResponse.close()
             val refreshedToken = refreshAccessToken(force = true).getOrThrow()
-            executePlaylistRequest(playlistId, refreshedToken).use { response ->
-                response.toResult(playlistId)
-            }
+            executePlaylistRequest(playlistId, refreshedToken).toResult(playlistId)
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: Throwable) {
@@ -180,7 +179,7 @@ class SpotifyPlaylistClient @Inject constructor(
         }
     }
 
-    private fun executePlaylistRequest(playlistId: String, accessToken: String): okhttp3.Response {
+    private fun executePlaylistRequest(playlistId: String, accessToken: String): Response {
         val request = Request.Builder()
             .url("$API_BASE_URL/playlists/$playlistId")
             .get()
@@ -190,27 +189,31 @@ class SpotifyPlaylistClient @Inject constructor(
         return client.newCall(request).execute()
     }
 
-    private fun okhttp3.Response.toResult(playlistId: String): Result<SpotifyPlaylistPreview> = use {
-        val body = it.body?.string().orEmpty()
+    private fun Response.toResult(playlistId: String): Result<SpotifyPlaylistPreview> = use { response ->
+        val body = response.body?.string().orEmpty()
         when {
-            it.isSuccessful -> runCatching {
+            response.isSuccessful -> runCatching {
                 json.decodeFromString<SpotifyPlaylistResponse>(body).toPreview()
             }
 
-            it.code == HTTP_NOT_FOUND -> Result.failure(
+            response.code == HTTP_NOT_FOUND -> Result.failure(
                 IllegalArgumentException("Spotify could not find playlist $playlistId or it is not visible to this account."),
             )
 
-            it.code == HTTP_FORBIDDEN -> Result.failure(
+            response.code == HTTP_FORBIDDEN -> Result.failure(
                 IllegalStateException("This Spotify account is not permitted to read that playlist."),
             )
 
-            it.code == HTTP_UNAUTHORIZED -> Result.failure(
+            response.code == HTTP_UNAUTHORIZED -> Result.failure(
                 IllegalStateException("Spotify authorisation expired. Re-authorise Spotify to continue."),
             )
 
+            response.code == HTTP_RATE_LIMITED -> Result.failure(
+                IllegalStateException("Spotify rate-limited this request. Try again later."),
+            )
+
             else -> Result.failure(
-                IllegalStateException("Spotify playlist request failed with HTTP ${it.code}."),
+                IllegalStateException("Spotify playlist request failed with HTTP ${response.code}."),
             )
         }
     }
@@ -234,14 +237,19 @@ class SpotifyPlaylistClient @Inject constructor(
         totalTracks = tracks.total,
         tracks = tracks.items.mapNotNull { item ->
             val track = item.track ?: return@mapNotNull null
-            if (track.type != "track" || track.id.isNullOrBlank()) return@mapNotNull null
+            val trackId = track.id?.takeIf(String::isNotBlank) ?: return@mapNotNull null
+            val album = track.album
+            if (track.type != "track" || album == null) return@mapNotNull null
             SpotifyPlaylistTrackPreview(
-                id = track.id,
+                id = trackId,
                 name = track.name,
-                artists = track.artists.joinToString { artist -> artist.name },
-                albumName = track.album.name,
-                imageUrl = track.album.images.maxByOrNull { image -> image.width ?: 0 }?.url,
-                externalUrl = track.externalUrls.spotify,
+                artists = track.artists.joinToString { artist -> artist.name }
+                    .ifBlank { "Unknown artist" },
+                albumName = album.name,
+                imageUrl = album.images.maxByOrNull { image -> image.width ?: 0 }?.url,
+                externalUrl = track.externalUrls.spotify.ifBlank {
+                    "https://open.spotify.com/track/$trackId"
+                },
                 durationMs = track.durationMs,
                 explicit = track.explicit,
             )
@@ -256,6 +264,7 @@ class SpotifyPlaylistClient @Inject constructor(
         const val HTTP_UNAUTHORIZED = 401
         const val HTTP_FORBIDDEN = 403
         const val HTTP_NOT_FOUND = 404
+        const val HTTP_RATE_LIMITED = 429
     }
 }
 
@@ -283,7 +292,7 @@ private data class SpotifyPlaylistResponse(
     val description: String? = null,
     val images: List<SpotifyImage> = emptyList(),
     val owner: SpotifyOwner,
-    @SerialName("external_urls") val externalUrls: SpotifyExternalUrls,
+    @SerialName("external_urls") val externalUrls: SpotifyExternalUrls = SpotifyExternalUrls(),
     val tracks: SpotifyPlaylistTracks,
 )
 
@@ -319,10 +328,10 @@ private data class SpotifyPlaylistItem(
 @Serializable
 private data class SpotifyTrack(
     val id: String? = null,
-    val name: String,
+    val name: String = "",
     val type: String = "track",
     val artists: List<SpotifyArtist> = emptyList(),
-    val album: SpotifyAlbum,
+    val album: SpotifyAlbum? = null,
     @SerialName("external_urls") val externalUrls: SpotifyExternalUrls = SpotifyExternalUrls(),
     @SerialName("duration_ms") val durationMs: Long = 0L,
     val explicit: Boolean = false,
