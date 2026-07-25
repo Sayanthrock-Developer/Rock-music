@@ -3,7 +3,9 @@ package com.rockmusic.app.presentation
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -39,6 +41,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,6 +55,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rockmusic.app.domain.model.LocalTrack
 
@@ -63,6 +69,7 @@ fun SongManagerScreen(
     BackHandler(onBack = onClose)
 
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val state by viewModel.libraryState.collectAsStateWithLifecycle()
     var selectedUris by remember { mutableStateOf<Set<String>>(emptySet()) }
     val allTrackUris = remember(state.tracks) {
@@ -80,8 +87,9 @@ fun SongManagerScreen(
             ContextCompat.checkSelfPermission(context, audioPermission) == PackageManager.PERMISSION_GRANTED,
         )
     }
+    var permissionMessage by remember { mutableStateOf<String?>(null) }
 
-    fun persistReadAccess(uri: android.net.Uri) {
+    fun persistReadAccess(uri: Uri) {
         runCatching {
             context.contentResolver.takePersistableUriPermission(
                 uri,
@@ -121,7 +129,27 @@ fun SongManagerScreen(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
         hasAudioPermission = granted
-        if (granted) viewModel.addAllSongs(autoPlay = true)
+        if (granted) {
+            permissionMessage = null
+            viewModel.addAllSongs(autoPlay = true)
+        } else {
+            permissionMessage =
+                "Music access was denied. Grant audio access in App settings to use Add All Songs."
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, context, audioPermission) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                hasAudioPermission = ContextCompat.checkSelfPermission(
+                    context,
+                    audioPermission,
+                ) == PackageManager.PERMISSION_GRANTED
+                if (hasAudioPermission) permissionMessage = null
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     LaunchedEffect(allTrackUris) {
@@ -200,6 +228,7 @@ fun SongManagerScreen(
                     Button(
                         onClick = {
                             if (hasAudioPermission) {
+                                permissionMessage = null
                                 viewModel.addAllSongs(autoPlay = true)
                             } else {
                                 permissionLauncher.launch(audioPermission)
@@ -215,6 +244,37 @@ fun SongManagerScreen(
                         }
                         Spacer(Modifier.width(8.dp))
                         Text("Add All Songs")
+                    }
+                }
+            }
+        }
+
+        if (permissionMessage != null) {
+            item {
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.errorContainer,
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            permissionMessage.orEmpty(),
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                        )
+                        OutlinedButton(
+                            onClick = {
+                                context.startActivity(
+                                    Intent(
+                                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        Uri.parse("package:${context.packageName}"),
+                                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                            },
+                        ) {
+                            Text("Open App settings")
+                        }
                     }
                 }
             }
