@@ -122,7 +122,7 @@ fun IntegrationConnectionsScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text("Connections unavailable", fontWeight = FontWeight.Bold)
-                        Text(state.error)
+                        Text(state.error.orEmpty())
                         Button(onClick = viewModel::refresh) {
                             Icon(Icons.Rounded.Refresh, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
@@ -209,15 +209,18 @@ private fun IntegrationAvailability.toStatusText(): Pair<String, String> = when 
         "Error" to message
 }
 
-private fun ProviderCapabilities.toReadableCapabilities(): String = buildList {
-    if (canSearch) add("search")
-    if (canStream) add("licensed streaming")
-    if (canOpenOfficialPlayback) add("official playback")
-    if (canReadPlaylistMetadata) add("playlist metadata")
-    if (canRecognizeAudio) add("audio recognition")
-    if (canProvideLyrics) add("lyrics")
-    if (canSearchPodcasts) add("podcast search")
-    if (canCreateListeningRooms) add("listening rooms")
-    if (canShareActivity) add("activity sharing")
-    if (canDownload) add("provider-permitted downloads")
-}.joinToString(prefix = "Capabilities: ")
+private fun ProviderCapabilities.toReadableCapabilities(): String {
+    val capabilities = buildList {
+        if (canSearch) add("search")
+        if (canStream) add("licensed streaming")
+        if (canOpenOfficialPlayback) add("official playback")
+        if (canReadPlaylistMetadata) add("playlist metadata")
+        if (canRecognizeAudio) add("audio recognition")
+        if (canProvideLyrics) add("lyrics")
+        if (canSearchPodcasts) add("podcast search")
+        if (canCreateListeningRooms) add("listening rooms")
+        if (canShareActivity) add("activity sharing")
+        if (canDownload) add("provider-permitted downloads")
+    }
+    return if (capabilities.isEmpty()) "" else capabilities.joinToString(prefix = "Capabilities: ")
+}
