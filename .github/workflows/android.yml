@@ -23,6 +23,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Prepare Compose compatibility diagnostic
+        run: |
+          sed -i '/import androidx.compose.foundation.layout.weight/d' app/src/main/java/com/rockmusic/app/presentation/RockMusicRoot.kt
+          sed -i '/import androidx.compose.foundation.layout.weight/d' app/src/main/java/com/rockmusic/app/presentation/settings/AppearanceScreen.kt
+
+      - name: Upload corrected source diagnostic
+        uses: actions/upload-artifact@v4
+        with:
+          name: rock-music-corrected-compose-source
+          path: |
+            app/src/main/java/com/rockmusic/app/presentation/RockMusicRoot.kt
+            app/src/main/java/com/rockmusic/app/presentation/settings/AppearanceScreen.kt
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
