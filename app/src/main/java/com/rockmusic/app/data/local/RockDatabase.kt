@@ -32,9 +32,6 @@ interface TrackDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(items: List<TrackEntity>)
-
-    @Query("DELETE FROM tracks WHERE id = :id")
-    suspend fun delete(id: String)
 }
 
 @Database(
