@@ -253,18 +253,23 @@ class PlayerConnection @Inject constructor(
         )
     }
 
-    private fun queueSnapshot(player: Player): List<PlayerQueueItem> = buildList {
-        for (index in 0 until player.mediaItemCount) {
+    private fun queueSnapshot(player: Player): List<PlayerQueueItem> {
+        val count = player.mediaItemCount
+        if (count == 0) return emptyList()
+        val list = ArrayList<PlayerQueueItem>(count)
+        for (index in 0 until count) {
             val item = player.getMediaItemAt(index)
-            add(
+            val metadata = item.mediaMetadata
+            list.add(
                 PlayerQueueItem(
                     mediaId = item.mediaId,
-                    title = item.mediaMetadata.title?.toString().orEmpty().ifBlank { "Unknown title" },
-                    artist = item.mediaMetadata.artist?.toString().orEmpty().ifBlank { "Unknown artist" },
-                    artworkUri = item.mediaMetadata.artworkUri?.toString(),
-                ),
+                    title = metadata.title?.toString().orEmpty().ifBlank { "Unknown title" },
+                    artist = metadata.artist?.toString().orEmpty().ifBlank { "Unknown artist" },
+                    artworkUri = metadata.artworkUri?.toString(),
+                )
             )
         }
+        return list
     }
 
     private data class PendingQueue(
