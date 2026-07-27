@@ -80,7 +80,7 @@ Production workers must revalidate the exact item immediately before transfer an
 
 ## User-authorised cloud storage
 
-`CloudAuthorizationRequest` carries state, redirect URI, lifetime, and optional PKCE values. `CloudFilePage`, playback access, and download grants operate only on files visible to the authorising user.
+`CloudAuthorizationRequest` carries state, redirect URI, lifetime, and optional PKCE values. File listings, playback access, and download grants operate only on files visible to the authorising user.
 
 A production adapter must request the minimum read-only scope, store refresh tokens in Android Keystore-backed storage, revoke access on disconnect, and never upload or modify user files unless a separate capability is added and explicitly authorised.
 
