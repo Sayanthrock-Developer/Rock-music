@@ -5,7 +5,6 @@ import androidx.room.Room
 import com.rockmusic.app.data.local.LocalMusicRepository
 import com.rockmusic.app.data.local.MediaStoreLocalMusicRepository
 import com.rockmusic.app.data.local.RockDatabase
-import com.rockmusic.app.data.local.TrackDao
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -32,7 +31,4 @@ object DatabaseModule {
         Room.databaseBuilder(context, RockDatabase::class.java, "rock_music.db")
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
-
-    @Provides
-    fun provideTrackDao(database: RockDatabase): TrackDao = database.trackDao()
 }
