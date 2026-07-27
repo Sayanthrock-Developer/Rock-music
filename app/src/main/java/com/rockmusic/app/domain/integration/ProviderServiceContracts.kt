@@ -425,20 +425,6 @@ data class CloudPlaybackAccess(
 
 interface CloudStorageProvider : IntegrationGateway {
     fun createAuthorizationUri(state: String): ProviderCallResult<String>
-    fun createAuthorizationRequest(
-        state: String,
-        redirectUri: String,
-        createdAtEpochMs: Long,
-        expiresAtEpochMs: Long,
-    ): ProviderCallResult<CloudAuthorizationRequest> = createAuthorizationUri(state).mapValue { uri ->
-        CloudAuthorizationRequest(
-            authorizationUri = uri,
-            state = state,
-            redirectUri = redirectUri,
-            createdAtEpochMs = createdAtEpochMs,
-            expiresAtEpochMs = expiresAtEpochMs,
-        )
-    }
     suspend fun exchangeAuthorizationCode(code: String): ProviderCallResult<Unit>
     suspend fun listAudioFiles(pageToken: String? = null): ProviderCallResult<List<CloudFile>>
     suspend fun playbackAccess(fileId: String): ProviderCallResult<ProviderTrack>
