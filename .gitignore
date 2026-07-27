@@ -11,3 +11,5 @@
 *.jks
 *.keystore
 secrets.properties
+gradle-8.11.1/
+gradle-8.11.1-bin.zip
