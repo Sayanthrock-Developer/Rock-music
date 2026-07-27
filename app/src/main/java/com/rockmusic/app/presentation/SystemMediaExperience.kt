@@ -46,10 +46,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -87,17 +85,17 @@ fun SystemMediaExperience(
     mainViewModel: MainViewModel = hiltViewModel(),
     controlsViewModel: SystemMediaViewModel = hiltViewModel(),
 ) {
-    val player by mainViewModel.playerState.collectAsStateWithLifecycle()
-    val lyrics by controlsViewModel.lyricsState.collectAsStateWithLifecycle()
-    val routes by controlsViewModel.routeState.collectAsStateWithLifecycle()
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    var panel by rememberSaveable { mutableStateOf(PlayerPanel.QUEUE) }
+    val playerState = mainViewModel.playerState.collectAsStateWithLifecycle()
+    val lyricsState = controlsViewModel.lyricsState.collectAsStateWithLifecycle()
+    val routesState = controlsViewModel.routeState.collectAsStateWithLifecycle()
+    val expandedState = rememberSaveable { mutableStateOf(false) }
+    val panelState = rememberSaveable { mutableStateOf(PlayerPanel.QUEUE) }
 
-    LaunchedEffect(requestedPlayerSurface, player.hasMedia) {
-        if (requestedPlayerSurface == MediaSessionCommands.SURFACE_LYRICS && player.hasMedia) {
-            expanded = true
-            panel = PlayerPanel.LYRICS
-            controlsViewModel.loadLyrics(player.mediaUri)
+    LaunchedEffect(requestedPlayerSurface, playerState.value.hasMedia) {
+        if (requestedPlayerSurface == MediaSessionCommands.SURFACE_LYRICS && playerState.value.hasMedia) {
+            expandedState.value = true
+            panelState.value = PlayerPanel.LYRICS
+            controlsViewModel.loadLyrics(playerState.value.mediaUri)
             onRequestedPlayerSurfaceConsumed()
         }
     }
@@ -112,10 +110,10 @@ fun SystemMediaExperience(
             viewModel = mainViewModel,
         )
 
-        if (player.hasMedia && !expanded) {
+        if (playerState.value.hasMedia && !expandedState.value) {
             MediaPill(
-                player = player,
-                onOpen = { expanded = true },
+                player = playerState.value,
+                onOpen = { expandedState.value = true },
                 onToggle = mainViewModel::togglePlayPause,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -124,18 +122,18 @@ fun SystemMediaExperience(
             )
         }
 
-        if (expanded && player.hasMedia) {
+        if (expandedState.value && playerState.value.hasMedia) {
             ExpandedSystemPlayer(
-                player = player,
-                selectedPanel = panel,
-                lyrics = lyrics,
-                routes = routes,
-                onClose = { expanded = false },
+                player = playerState.value,
+                selectedPanel = panelState.value,
+                lyrics = lyricsState.value,
+                routes = routesState.value,
+                onClose = { expandedState.value = false },
                 onPanel = { selected ->
-                    panel = selected
+                    panelState.value = selected
                     when (selected) {
                         PlayerPanel.QUEUE -> Unit
-                        PlayerPanel.LYRICS -> controlsViewModel.loadLyrics(player.mediaUri)
+                        PlayerPanel.LYRICS -> controlsViewModel.loadLyrics(playerState.value.mediaUri)
                         PlayerPanel.OUTPUT -> controlsViewModel.refreshAudioRoutes()
                     }
                 },
@@ -226,8 +224,8 @@ private fun ExpandedSystemPlayer(
     onQueueItem: (Int) -> Unit,
     onRoute: (Int) -> Unit,
 ) {
-    var draggedPosition by rememberSaveable(player.mediaUri) { mutableStateOf<Float?>(null) }
-    var draggedVolume by rememberSaveable { mutableStateOf<Float?>(null) }
+    val draggedPositionState = rememberSaveable(player.mediaUri) { mutableStateOf<Float?>(null) }
+    val draggedVolumeState = rememberSaveable { mutableStateOf<Float?>(null) }
 
     BackHandler(onBack = onClose)
     LazyColumn(
@@ -252,17 +250,17 @@ private fun ExpandedSystemPlayer(
         item {
             PlayerCard(
                 player = player,
-                draggedPosition = draggedPosition,
-                onDraggedPosition = { draggedPosition = it },
+                draggedPosition = draggedPositionState.value,
+                onDraggedPosition = { draggedPositionState.value = it },
                 onPositionFinished = {
-                    draggedPosition?.let { onSeek(it.toLong()) }
-                    draggedPosition = null
+                    draggedPositionState.value?.let { onSeek(it.toLong()) }
+                    draggedPositionState.value = null
                 },
-                draggedVolume = draggedVolume,
-                onDraggedVolume = { draggedVolume = it },
+                draggedVolume = draggedVolumeState.value,
+                onDraggedVolume = { draggedVolumeState.value = it },
                 onVolumeFinished = {
-                    draggedVolume?.let(onVolume)
-                    draggedVolume = null
+                    draggedVolumeState.value?.let(onVolume)
+                    draggedVolumeState.value = null
                 },
                 onFavourite = onFavourite,
                 onPrevious = onPrevious,
