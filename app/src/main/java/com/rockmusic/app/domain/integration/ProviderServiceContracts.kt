@@ -417,11 +417,6 @@ data class CloudAuthorizationRequest(
     val expiresAtEpochMs: Long,
 )
 
-data class CloudFilePage(
-    val items: List<CloudFile>,
-    val nextPageToken: String? = null,
-)
-
 data class CloudPlaybackAccess(
     val file: CloudFile,
     val playbackUri: String,
@@ -446,8 +441,6 @@ interface CloudStorageProvider : IntegrationGateway {
     }
     suspend fun exchangeAuthorizationCode(code: String): ProviderCallResult<Unit>
     suspend fun listAudioFiles(pageToken: String? = null): ProviderCallResult<List<CloudFile>>
-    suspend fun listAudioFilePage(pageToken: String? = null): ProviderCallResult<CloudFilePage> =
-        listAudioFiles(pageToken).mapValue { CloudFilePage(it) }
     suspend fun playbackAccess(fileId: String): ProviderCallResult<ProviderTrack>
     suspend fun downloadGrant(fileId: String): ProviderCallResult<DownloadGrant>
 }
