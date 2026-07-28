@@ -15,10 +15,17 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.inject.Inject
 import javax.inject.Singleton
 
+interface TokenVaultApi {
+    fun put(key: String, value: String)
+    fun get(key: String): String?
+    fun remove(key: String)
+    fun clear()
+}
+
 @Singleton
 open class TokenVault @Inject constructor(
     @ApplicationContext context: Context,
-) {
+) : TokenVaultApi {
     private val masterKey = MasterKey.Builder(context)
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
         .build()
@@ -31,7 +38,7 @@ open class TokenVault @Inject constructor(
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
-    open fun put(key: String, value: String) {
+    override fun put(key: String, value: String) {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateSecretKey())
         val encrypted = cipher.doFinal(value.toByteArray(Charsets.UTF_8))
@@ -39,7 +46,7 @@ open class TokenVault @Inject constructor(
         preferences.edit().putString(key, payload).apply()
     }
 
-    open fun get(key: String): String? {
+    override fun get(key: String): String? {
         val payload = preferences.getString(key, null) ?: return null
         return runCatching {
             val decoded = Base64.decode(payload, Base64.NO_WRAP)
@@ -51,11 +58,11 @@ open class TokenVault @Inject constructor(
         }.getOrNull()
     }
 
-    open fun remove(key: String) {
+    override fun remove(key: String) {
         preferences.edit().remove(key).apply()
     }
 
-    open fun clear() {
+    override fun clear() {
         preferences.edit().clear().apply()
     }
 

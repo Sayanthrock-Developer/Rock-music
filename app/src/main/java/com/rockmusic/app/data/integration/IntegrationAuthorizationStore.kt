@@ -7,25 +7,19 @@ import javax.inject.Singleton
 
 @Singleton
 class IntegrationAuthorizationStore @Inject constructor(
-    private val vault: TokenVault,
+    private val tokenVault: TokenVault,
 ) {
-    fun isAuthorized(id: IntegrationId): Boolean =
-        vault.get(stateKey(id)) == AUTHORIZED
+    fun isAuthorized(id: IntegrationId): Boolean {
+        return tokenVault.get(keyFor(id)) != null
+    }
 
-    fun markAuthorized(id: IntegrationId, authorizedAtEpochMs: Long = System.currentTimeMillis()) {
-        vault.put(stateKey(id), AUTHORIZED)
-        vault.put(timestampKey(id), authorizedAtEpochMs.toString())
+    fun markAuthorized(id: IntegrationId) {
+        tokenVault.put(keyFor(id), "true")
     }
 
     fun clear(id: IntegrationId) {
-        vault.remove(stateKey(id))
-        vault.remove(timestampKey(id))
+        tokenVault.remove(keyFor(id))
     }
 
-    private fun stateKey(id: IntegrationId): String = "provider.authorization.${id.name}.state"
-    private fun timestampKey(id: IntegrationId): String = "provider.authorization.${id.name}.timestamp"
-
-    private companion object {
-        const val AUTHORIZED = "authorized"
-    }
+    private fun keyFor(id: IntegrationId): String = "authorized_${id.name}"
 }
