@@ -157,8 +157,8 @@ class MediaStoreLocalMusicRepository @Inject constructor(
         folders.values
             .map(FolderAccumulator::toFolder)
             .sortedWith(
-                compareBy<LocalMusicFolder> { it.displayName.lowercase() }
-                    .thenBy { it.displayPath.lowercase() },
+                compareBy<LocalMusicFolder, String>(String.CASE_INSENSITIVE_ORDER) { it.displayName }
+                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.displayPath },
             )
     }
 
@@ -327,8 +327,8 @@ class MediaStoreLocalMusicRepository @Inject constructor(
         }
 
         tracks.sortedWith(
-            compareBy<LocalTrack> { it.album.lowercase() }
-                .thenBy { it.title.lowercase() },
+            compareBy<LocalTrack, String>(String.CASE_INSENSITIVE_ORDER) { it.album }
+                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.title },
         )
     }
 
