@@ -62,25 +62,42 @@ class EmbeddedLyricsRepository @Inject constructor(
         val baseName = metadata.first.substringBeforeLast('.', metadata.first)
         val names = sidecarNames(baseName)
         val filesUri = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        // Optimization: Single query for all sidecar names using an IN clause
+        // What: Combined multiple ContentResolver queries into a single query using an IN clause.
+        // Why: Resolves the N+1 query problem for fetching sidecar lyrics, significantly reducing IPC overhead.
+        // Impact: Reduces allocations and CPU cycles spent on crossing the IPC boundary and establishing cursors.
+        // How to Measure: Use a profiler to measure IPC calls during bulk media operations. The single query functionally eliminates N-1 queries per audio file processed.
+        val placeholders = names.joinToString { "?" }
         val selection =
             "${MediaStore.MediaColumns.RELATIVE_PATH}=? AND " +
-                "${MediaStore.MediaColumns.DISPLAY_NAME}=?"
+                "${MediaStore.MediaColumns.DISPLAY_NAME} IN ($placeholders)"
+
+        val selectionArgs = arrayOf(metadata.second) + names.toTypedArray()
+
+        val sidecarFiles = mutableMapOf<String, Long>()
+        context.contentResolver.query(
+            filesUri,
+            arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME),
+            selection,
+            selectionArgs,
+            null,
+        )?.use { cursor ->
+            val idCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+            val nameCol = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+            while (cursor.moveToNext()) {
+                sidecarFiles[cursor.getString(nameCol)] = cursor.getLong(idCol)
+            }
+        }
 
         return names.asSequence()
             .mapNotNull { name ->
-                context.contentResolver.query(
-                    filesUri,
-                    arrayOf(MediaStore.MediaColumns._ID),
-                    selection,
-                    arrayOf(metadata.second, name),
-                    null,
-                )?.use { cursor ->
-                    if (!cursor.moveToFirst()) return@use null
-                    val sidecarUri = ContentUris.withAppendedId(filesUri, cursor.getLong(0))
+                val id = sidecarFiles[name] ?: return@mapNotNull null
+                val sidecarUri = ContentUris.withAppendedId(filesUri, id)
+                runCatching {
                     context.contentResolver.openInputStream(sidecarUri)
                         ?.bufferedReader(Charsets.UTF_8)
                         ?.use(::readLimitedText)
-                }
+                }.getOrNull()
             }
             .firstOrNull()
     }
