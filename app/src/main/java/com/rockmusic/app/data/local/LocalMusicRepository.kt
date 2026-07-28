@@ -18,6 +18,8 @@ import kotlin.math.abs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 
 interface LocalMusicRepository {
@@ -240,16 +242,20 @@ class MediaStoreLocalMusicRepository @Inject constructor(
 
     override suspend fun resolveAll(uris: List<Uri>): List<LocalTrack> = withContext(Dispatchers.IO) {
         val uniqueUris = uris.distinctBy(Uri::toString)
-        val tracks = uniqueUris.mapNotNull { uri ->
-            try {
-                resolve(uri)
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Throwable) {
-                Log.w(TAG, "Skipping unreadable audio URI: $uri", error)
-                null
+        // Optimization: Concurrently resolve metadata for all provided URIs
+        // to minimize sequential I/O bottlenecks.
+        val tracks = uniqueUris.map { uri ->
+            async {
+                try {
+                    resolve(uri)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    Log.w(TAG, "Skipping unreadable audio URI: $uri", error)
+                    null
+                }
             }
-        }
+        }.awaitAll().filterNotNull()
 
         require(tracks.isNotEmpty()) {
             "No supported audio files could be opened."
