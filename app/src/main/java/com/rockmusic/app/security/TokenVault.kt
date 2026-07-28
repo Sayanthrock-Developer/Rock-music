@@ -14,12 +14,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class TokenVault @Inject constructor(
+open class TokenVault @Inject constructor(
     @ApplicationContext context: Context,
 ) {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
 
-    fun put(key: String, value: String) {
+    open fun put(key: String, value: String) {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateSecretKey())
         val encrypted = cipher.doFinal(value.toByteArray(Charsets.UTF_8))
@@ -27,7 +27,7 @@ class TokenVault @Inject constructor(
         preferences.edit().putString(key, payload).apply()
     }
 
-    fun get(key: String): String? {
+    open fun get(key: String): String? {
         val payload = preferences.getString(key, null) ?: return null
         return runCatching {
             val decoded = Base64.decode(payload, Base64.NO_WRAP)
@@ -39,11 +39,11 @@ class TokenVault @Inject constructor(
         }.getOrNull()
     }
 
-    fun remove(key: String) {
+    open fun remove(key: String) {
         preferences.edit().remove(key).apply()
     }
 
-    fun clear() {
+    open fun clear() {
         preferences.edit().clear().apply()
     }
 
