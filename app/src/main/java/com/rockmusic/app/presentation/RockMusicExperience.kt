@@ -610,6 +610,13 @@ private fun ExperienceLibrary(
                 onValueChange = { query = it },
                 label = { Text("Search your library") },
                 leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (query.isNotBlank()) {
+                        IconButton(onClick = { query = "" }) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Clear search")
+                        }
+                    }
+                },
                 placeholder = { Text("Songs, artists, or albums") },
                 singleLine = true,
                 shape = RoundedCornerShape(22.dp),

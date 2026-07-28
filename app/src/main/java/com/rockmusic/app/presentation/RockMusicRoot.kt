@@ -501,6 +501,13 @@ private fun SearchScreen(tracks: List<LocalTrack>, onPlay: (LocalTrack) -> Unit)
             value = query,
             onValueChange = { query = it },
             leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+            trailingIcon = {
+                if (query.isNotBlank()) {
+                    IconButton(onClick = { query = "" }) {
+                        Icon(Icons.Rounded.Close, contentDescription = "Clear search")
+                    }
+                }
+            },
             placeholder = { Text("Songs, artists, albums, podcasts") },
             singleLine = true,
             shape = RoundedCornerShape(22.dp),
