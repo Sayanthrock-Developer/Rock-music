@@ -1,9 +1,6 @@
 package com.rockmusic.app.security
 
-import android.content.Context
-import androidx.test.core.app.ApplicationProvider
-
-class FakeTokenVault : TokenVault(ApplicationProvider.getApplicationContext<Context>()) {
+class FakeTokenVault : TokenVault() {
     private val store = mutableMapOf<String, String>()
 
     override fun put(key: String, value: String) {

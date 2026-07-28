@@ -1,8 +1,9 @@
 **What:**
-Requested clarification from the user regarding the ambiguous prompt "Will add a free song. Some songs and playlist All languages".
+Fixed the test failures regarding `IntegrationAuthorizationStoreTest` due to `java.security.NoSuchAlgorithmException`.
+The failures occurred on the `testDebugUnitTest` task, and they were caused because `FakeTokenVault` was instantiating `TokenVault` which directly tried to create `MasterKey`, triggering `java.security.NoSuchAlgorithmException` within the test environment (`RobolectricTestRunner`).
 
 **Why:**
-The prompt does not describe a clear feature, bug fix, or development task within the context of the Rock Music application codebase. It resembles user feedback from an app store. Proceeding without clarification could result in unintended or incorrect changes.
+We removed the hard dependency on Android context at instantiation to separate construction from initialization logic, enabling tests (using `FakeTokenVault`) to bypass encryption setup while preserving actual runtime behavior by providing a separate `@Inject` constructor for actual initialization. Also fixed the CI failure by removing the duplicate `robolectric` definition in the `libs.versions.toml`.
 
 **How to verify:**
-N/A - No code changes were made. Awaiting user response.
+Run `./gradlew testDebugUnitTest` and observe the tests pass.
