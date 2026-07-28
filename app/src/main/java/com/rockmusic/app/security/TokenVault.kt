@@ -17,19 +17,23 @@ import javax.inject.Singleton
 
 @Singleton
 open class TokenVault @Inject constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
 ) {
-    private val masterKey = MasterKey.Builder(context)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .build()
+    private val masterKey by lazy {
+        MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+    }
 
-    private val preferences = EncryptedSharedPreferences.create(
-        context,
-        PREFERENCES_NAME,
-        masterKey,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
+    private val preferences by lazy {
+        EncryptedSharedPreferences.create(
+            context,
+            PREFERENCES_NAME,
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    }
 
     open fun put(key: String, value: String) {
         val cipher = Cipher.getInstance(TRANSFORMATION)
