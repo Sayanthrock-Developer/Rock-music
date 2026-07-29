@@ -1,1 +1,3 @@
-🔒 Fix cleartext SharedPreferences for encrypted tokens
+ui: use OutlinedTextField for Search Views
+
+Replaced the filled TextField in RockMusicRoot with OutlinedTextField to provide a cleaner, more consistent look across search inputs. This aligns with the "neat and clean" standard look. Also updated .Jules/palette.md with this UI pattern.
