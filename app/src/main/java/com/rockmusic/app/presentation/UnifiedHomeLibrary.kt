@@ -27,8 +27,11 @@ object UnifiedHomeLibrary {
     }
 
     fun featuredTracks(tracks: List<LocalTrack>, limit: Int = 5): List<LocalTrack> = tracks
+        // Optimization: Use asSequence() for lazy evaluation to prevent distinctBy from processing the entire list
+        .asSequence()
         .distinctBy(LocalTrack::mediaUri)
         .take(limit.coerceAtLeast(0))
+        .toList()
 
     fun speedDialRows(
         tracks: List<LocalTrack>,
