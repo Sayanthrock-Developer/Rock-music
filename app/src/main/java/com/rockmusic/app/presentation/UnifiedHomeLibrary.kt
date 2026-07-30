@@ -16,14 +16,17 @@ object UnifiedHomeLibrary {
     ): List<LocalTrack> {
         if (source == UnifiedHomeSource.YOUTUBE) return emptyList()
         val cleanedQuery = query.trim()
-        return tracks
-            .distinctBy(LocalTrack::mediaUri)
-            .filter { track ->
-                cleanedQuery.isBlank() ||
-                    track.title.contains(cleanedQuery, ignoreCase = true) ||
+        val uniqueTracks = tracks.asSequence().distinctBy(LocalTrack::mediaUri)
+
+        return if (cleanedQuery.isBlank()) {
+            uniqueTracks.toList()
+        } else {
+            uniqueTracks.filter { track ->
+                track.title.contains(cleanedQuery, ignoreCase = true) ||
                     track.artist.contains(cleanedQuery, ignoreCase = true) ||
                     track.album.contains(cleanedQuery, ignoreCase = true)
-            }
+            }.toList()
+        }
     }
 
     fun featuredTracks(tracks: List<LocalTrack>, limit: Int = 5): List<LocalTrack> = tracks
@@ -37,6 +40,8 @@ object UnifiedHomeLibrary {
         tracks: List<LocalTrack>,
         columns: Int = 3,
     ): List<List<LocalTrack>> = tracks
+        .asSequence()
         .distinctBy(LocalTrack::mediaUri)
         .chunked(columns.coerceAtLeast(1))
+        .toList()
 }
