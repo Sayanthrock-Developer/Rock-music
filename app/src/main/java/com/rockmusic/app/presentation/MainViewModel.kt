@@ -264,8 +264,9 @@ class MainViewModel @Inject constructor(
     }
 
     fun playAll(tracks: List<LocalTrack>) {
-        val decisions = tracks.distinctBy(LocalTrack::mediaUri)
+        val decisions = tracks.asSequence().distinctBy(LocalTrack::mediaUri)
             .map { track -> track to mediaActionPolicy.decide(track.toPlayRequest()) }
+            .toList()
 
         _lastActionDecision.value = decisions
             .firstOrNull { (_, decision) -> decision != MediaActionDecision.ExecuteInApp }
