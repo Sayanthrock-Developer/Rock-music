@@ -10,12 +10,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -70,6 +72,13 @@ internal fun SpotifyPlaylistPreviewCard(
                     Text("Example: open.spotify.com/playlist/... or spotify:playlist:...")
                 },
                 singleLine = true,
+                trailingIcon = {
+                    if (reference.isNotBlank()) {
+                        IconButton(onClick = { onReferenceChange("") }) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Clear input")
+                        }
+                    }
+                },
             )
 
             Row(
