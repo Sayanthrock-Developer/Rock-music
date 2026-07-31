@@ -37,6 +37,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Palette
@@ -109,6 +110,7 @@ fun RockMusicExperience(
     onOpenConnections: () -> Unit,
     onOpenSongManager: () -> Unit,
     onOpenFolderManager: () -> Unit,
+    onOpenEqualizer: () -> Unit,
     viewModel: MainViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -185,6 +187,7 @@ fun RockMusicExperience(
                         onOpenAudio = { openAudio.launch(arrayOf("audio/*")) },
                         onOpenSongManager = onOpenSongManager,
                         onOpenFolderManager = onOpenFolderManager,
+                        onOpenEqualizer = onOpenEqualizer,
                         onOpenConnections = onOpenConnections,
                         onOpenAppearance = onOpenAppearance,
                         onYouTubeSearch = viewModel::openOfficialYouTubeSearch,
@@ -206,6 +209,7 @@ fun RockMusicExperience(
                         onOpenConnections = onOpenConnections,
                         onOpenSongManager = onOpenSongManager,
                         onOpenFolderManager = onOpenFolderManager,
+                        onOpenEqualizer = onOpenEqualizer,
                     )
                 }
             }
@@ -240,6 +244,7 @@ private fun ExperienceHome(
     onOpenAudio: () -> Unit,
     onOpenSongManager: () -> Unit,
     onOpenFolderManager: () -> Unit,
+    onOpenEqualizer: () -> Unit,
     onOpenConnections: () -> Unit,
     onOpenAppearance: () -> Unit,
     onYouTubeSearch: (String) -> Unit,
@@ -657,6 +662,7 @@ private fun ExperienceSettings(
     onOpenConnections: () -> Unit,
     onOpenSongManager: () -> Unit,
     onOpenFolderManager: () -> Unit,
+    onOpenEqualizer: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -691,6 +697,14 @@ private fun ExperienceSettings(
                 "Review YouTube, Spotify, lyrics, cloud, Discord, and provider readiness.",
                 Icons.Rounded.Settings,
                 onOpenConnections,
+            )
+        }
+        item {
+            ExperienceSettingsCard(
+                "Equalizer",
+                "Adjust audio frequencies and effects for playback.",
+                Icons.Rounded.Equalizer,
+                onOpenEqualizer,
             )
         }
         item {

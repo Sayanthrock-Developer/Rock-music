@@ -82,6 +82,7 @@ fun SystemMediaExperience(
     onOpenConnections: () -> Unit,
     onOpenSongManager: () -> Unit,
     onOpenFolderManager: () -> Unit,
+    onOpenEqualizer: () -> Unit,
     mainViewModel: MainViewModel = hiltViewModel(),
     controlsViewModel: SystemMediaViewModel = hiltViewModel(),
 ) {
@@ -107,6 +108,7 @@ fun SystemMediaExperience(
             onOpenConnections = onOpenConnections,
             onOpenSongManager = onOpenSongManager,
             onOpenFolderManager = onOpenFolderManager,
+            onOpenEqualizer = onOpenEqualizer,
             viewModel = mainViewModel,
         )
 

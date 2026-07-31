@@ -16,14 +16,22 @@ object UnifiedHomeLibrary {
     ): List<LocalTrack> {
         if (source == UnifiedHomeSource.YOUTUBE) return emptyList()
         val cleanedQuery = query.trim()
+
+        // ⚡ Bolt: skip filtering completely for blank queries
+        if (cleanedQuery.isBlank()) {
+            return tracks.distinctBy(LocalTrack::mediaUri)
+        }
+
+        // ⚡ Bolt: use asSequence() for lazy evaluation to avoid intermediate list allocations
         return tracks
+            .asSequence()
             .distinctBy(LocalTrack::mediaUri)
             .filter { track ->
-                cleanedQuery.isBlank() ||
-                    track.title.contains(cleanedQuery, ignoreCase = true) ||
+                track.title.contains(cleanedQuery, ignoreCase = true) ||
                     track.artist.contains(cleanedQuery, ignoreCase = true) ||
                     track.album.contains(cleanedQuery, ignoreCase = true)
             }
+            .toList()
     }
 
     fun featuredTracks(tracks: List<LocalTrack>, limit: Int = 5): List<LocalTrack> = tracks
@@ -37,6 +45,9 @@ object UnifiedHomeLibrary {
         tracks: List<LocalTrack>,
         columns: Int = 3,
     ): List<List<LocalTrack>> = tracks
+        // ⚡ Bolt: use asSequence() for lazy evaluation to avoid intermediate list allocations
+        .asSequence()
         .distinctBy(LocalTrack::mediaUri)
         .chunked(columns.coerceAtLeast(1))
+        .toList()
 }

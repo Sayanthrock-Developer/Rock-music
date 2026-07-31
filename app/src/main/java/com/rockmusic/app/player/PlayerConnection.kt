@@ -218,12 +218,14 @@ class PlayerConnection @Inject constructor(
         }
     }
 
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     private fun publish(player: Player, includeQueue: Boolean) {
         val currentState = _state.value
         val mediaItem = player.currentMediaItem
         if (mediaItem == null) {
             _state.value = PlayerUiState(
                 volume = player.volume.coerceIn(0f, 1f),
+                audioSessionId = (player as? androidx.media3.exoplayer.ExoPlayer)?.audioSessionId ?: 0,
                 queue = if (includeQueue) queueSnapshot(player) else emptyList(),
                 errorMessage = currentState.errorMessage,
             )
@@ -247,6 +249,7 @@ class PlayerConnection @Inject constructor(
             hasNext = player.hasNextMediaItem(),
             hasPrevious = player.hasPreviousMediaItem(),
             volume = player.volume.coerceIn(0f, 1f),
+                audioSessionId = (player as? androidx.media3.exoplayer.ExoPlayer)?.audioSessionId ?: 0,
             currentQueueIndex = player.currentMediaItemIndex.coerceAtLeast(0),
             queue = if (includeQueue) queueSnapshot(player) else currentState.queue,
             errorMessage = currentState.errorMessage,
@@ -302,6 +305,7 @@ data class PlayerUiState(
     val queue: List<PlayerQueueItem> = emptyList(),
     val currentQueueIndex: Int = 0,
     val errorMessage: String? = null,
+    val audioSessionId: Int = 0,
 ) {
     val hasMedia: Boolean get() = title != null
 }

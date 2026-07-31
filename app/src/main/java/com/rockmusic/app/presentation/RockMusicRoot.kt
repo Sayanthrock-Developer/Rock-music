@@ -56,6 +56,7 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -111,6 +112,7 @@ fun RockMusicRoot(
     useBlurFrames: Boolean,
     onOpenAppearance: () -> Unit,
     onOpenConnections: () -> Unit,
+    onOpenEqualizer: () -> Unit,
     viewModel: MainViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -170,6 +172,7 @@ fun RockMusicRoot(
                             chooseDownloadedAudio = chooseDownloadedAudio,
                             onOpenAppearance = onOpenAppearance,
                             onOpenConnections = onOpenConnections,
+                            onOpenEqualizer = onOpenEqualizer,
                             useBlurFrames = useBlurFrames,
                         )
                         PlayerOverlay(
@@ -217,6 +220,7 @@ fun RockMusicRoot(
                             chooseDownloadedAudio = chooseDownloadedAudio,
                             onOpenAppearance = onOpenAppearance,
                             onOpenConnections = onOpenConnections,
+                            onOpenEqualizer = onOpenEqualizer,
                             useBlurFrames = useBlurFrames,
                         )
                     }
@@ -250,6 +254,7 @@ private fun DestinationContent(
     chooseDownloadedAudio: () -> Unit,
     onOpenAppearance: () -> Unit,
     onOpenConnections: () -> Unit,
+    onOpenEqualizer: () -> Unit,
     useBlurFrames: Boolean,
 ) {
     when (destination) {
@@ -273,6 +278,7 @@ private fun DestinationContent(
         Destination.Profile -> ProfileScreen(
             onOpenAppearance = onOpenAppearance,
             onOpenConnections = onOpenConnections,
+            onOpenEqualizer = onOpenEqualizer,
             useBlurFrames = useBlurFrames,
         )
     }
@@ -646,6 +652,7 @@ private fun EchoFindScreen() {
 private fun ProfileScreen(
     onOpenAppearance: () -> Unit,
     onOpenConnections: () -> Unit,
+    onOpenEqualizer: () -> Unit,
     useBlurFrames: Boolean,
 ) {
     LazyColumn(
@@ -654,6 +661,15 @@ private fun ProfileScreen(
         modifier = Modifier.fillMaxSize(),
     ) {
         item { Text("Settings", style = MaterialTheme.typography.displaySmall) }
+        item {
+            ActionCard(
+                title = "Equalizer",
+                body = "Adjust audio frequencies and effects for playback.",
+                icon = Icons.Rounded.Equalizer,
+                button = "Open equalizer",
+                onClick = onOpenEqualizer,
+            )
+        }
         item {
             ActionCard(
                 title = "Appearance",

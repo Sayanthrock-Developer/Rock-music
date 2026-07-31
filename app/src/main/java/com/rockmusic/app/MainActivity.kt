@@ -23,6 +23,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.rockmusic.app.presentation.MainViewModel
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -35,6 +37,7 @@ import com.rockmusic.app.presentation.SongManagerScreen
 import com.rockmusic.app.presentation.ValidatedSystemMediaExperience
 import com.rockmusic.app.presentation.integrations.IntegrationConnectionsScreen
 import com.rockmusic.app.presentation.settings.AppearanceScreen
+import com.rockmusic.app.presentation.settings.EqualizerLauncher
 import com.rockmusic.app.presentation.theme.AppearancePreferences
 import com.rockmusic.app.presentation.theme.AppearanceSettingsSaver
 import com.rockmusic.app.presentation.theme.RockMusicTheme
@@ -112,6 +115,7 @@ private fun RockMusicApp(
     onConnectionsCallbackConsumed: () -> Unit
 ) {
     val applicationContext = LocalContext.current.applicationContext
+    val viewModel: MainViewModel = hiltViewModel()
     val appearancePreferences = remember { AppearancePreferences(applicationContext) }
     val lifecycleOwner = LocalLifecycleOwner.current
     val audioPermission = if (Build.VERSION.SDK_INT >= 33) {
@@ -201,6 +205,7 @@ private fun RockMusicApp(
                         onOpenConnections = { showConnections = true },
                         onOpenSongManager = { showSongManager = true },
                         onOpenFolderManager = { showFolderManager = true },
+                onOpenEqualizer = { EqualizerLauncher.openEqualizer(applicationContext, viewModel.playerState.value.audioSessionId) },
                     )
                 }
             }

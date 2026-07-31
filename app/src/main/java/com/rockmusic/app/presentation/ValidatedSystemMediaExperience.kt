@@ -16,6 +16,7 @@ fun ValidatedSystemMediaExperience(
     onOpenConnections: () -> Unit,
     onOpenSongManager: () -> Unit,
     onOpenFolderManager: () -> Unit,
+    onOpenEqualizer: () -> Unit,
     mainViewModel: MainViewModel = hiltViewModel(),
 ) {
     val player by mainViewModel.playerState.collectAsStateWithLifecycle()
@@ -37,6 +38,7 @@ fun ValidatedSystemMediaExperience(
         onOpenConnections = onOpenConnections,
         onOpenSongManager = onOpenSongManager,
         onOpenFolderManager = onOpenFolderManager,
+        onOpenEqualizer = onOpenEqualizer,
         mainViewModel = mainViewModel,
     )
 }
