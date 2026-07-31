@@ -12,6 +12,8 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.google.common.util.concurrent.FutureCallback
+import com.google.common.util.concurrent.Futures
 import com.rockmusic.app.domain.model.LocalTrack
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -66,31 +68,35 @@ class PlayerConnection @Inject constructor(
     init {
         val token = SessionToken(context, ComponentName(context, MusicService::class.java))
         val future = MediaController.Builder(context, token).buildAsync()
-        future.addListener(
-            {
-                runCatching { future.get() }
-                    .onSuccess { mediaController ->
-                        controller = mediaController
-                        mediaController.addListener(listener)
-                        pendingVolume?.let { requestedVolume ->
-                            mediaController.volume = requestedVolume
-                            pendingVolume = null
-                        }
-                        val queue = pendingQueue
-                        if (queue == null) {
-                            publish(mediaController, includeQueue = true)
-                        } else {
-                            pendingQueue = null
-                            startPlayback(mediaController, queue.tracks, queue.startIndex)
-                        }
-                        startPositionUpdates()
+        // ⚡ Bolt: Replaced blocking future.get() inside listener with Guava's Futures.addCallback
+        // to avoid blocking the main UI thread executor when waiting for the MediaController setup.
+        Futures.addCallback(
+            future,
+            object : FutureCallback<MediaController> {
+                override fun onSuccess(mediaController: MediaController?) {
+                    if (mediaController == null) return
+                    controller = mediaController
+                    mediaController.addListener(listener)
+                    pendingVolume?.let { requestedVolume ->
+                        mediaController.volume = requestedVolume
+                        pendingVolume = null
                     }
-                    .onFailure { error ->
-                        _state.value = _state.value.copy(
-                            isPreparing = false,
-                            errorMessage = error.message ?: "Unable to start the audio player.",
-                        )
+                    val queue = pendingQueue
+                    if (queue == null) {
+                        publish(mediaController, includeQueue = true)
+                    } else {
+                        pendingQueue = null
+                        startPlayback(mediaController, queue.tracks, queue.startIndex)
                     }
+                    startPositionUpdates()
+                }
+
+                override fun onFailure(error: Throwable) {
+                    _state.value = _state.value.copy(
+                        isPreparing = false,
+                        errorMessage = error.message ?: "Unable to start the audio player.",
+                    )
+                }
             },
             ContextCompat.getMainExecutor(context),
         )
