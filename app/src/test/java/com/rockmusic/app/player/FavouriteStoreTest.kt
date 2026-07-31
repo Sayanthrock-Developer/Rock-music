@@ -15,7 +15,7 @@ class FavouriteStoreTest {
     fun setup() {
         sharedPreferences = FakeSharedPreferences()
         context = FakeContext(sharedPreferences)
-        favouriteStore = FavouriteStore(context)
+        favouriteStore = FavouriteStore(sharedPreferences)
     }
 
     @Test
