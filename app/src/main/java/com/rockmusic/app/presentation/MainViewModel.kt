@@ -264,17 +264,22 @@ class MainViewModel @Inject constructor(
     }
 
     fun playAll(tracks: List<LocalTrack>) {
-        val decisions = tracks.distinctBy(LocalTrack::mediaUri)
+        // ⚡ Bolt: use asSequence() for lazy evaluation to avoid intermediate list allocations
+        val decisions = tracks.asSequence()
+            .distinctBy(LocalTrack::mediaUri)
             .map { track -> track to mediaActionPolicy.decide(track.toPlayRequest()) }
+            .toList()
 
         _lastActionDecision.value = decisions
             .firstOrNull { (_, decision) -> decision != MediaActionDecision.ExecuteInApp }
             ?.second
             ?: decisions.firstOrNull()?.second
 
-        val approvedTracks = decisions
+        // ⚡ Bolt: use asSequence() for lazy evaluation to avoid intermediate list allocations
+        val approvedTracks = decisions.asSequence()
             .filter { (_, decision) -> decision == MediaActionDecision.ExecuteInApp }
             .map(Pair<LocalTrack, MediaActionDecision>::first)
+            .toList()
 
         if (approvedTracks.isNotEmpty()) {
             playerConnection.playQueue(approvedTracks)
