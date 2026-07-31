@@ -3,6 +3,8 @@ package com.rockmusic.app.presentation.theme
 import android.content.Context
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 
 private const val PREFERENCES_NAME = "rock_music_appearance"
 private const val KEY_THEME_MODE = "theme_mode"
@@ -35,9 +37,16 @@ val AppearanceSettingsSaver: Saver<AppearanceSettings, Any> = listSaver(
 )
 
 class AppearancePreferences(context: Context) {
-    private val preferences = context.getSharedPreferences(
+    private val masterKey = MasterKey.Builder(context)
+        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+        .build()
+
+    private val preferences = EncryptedSharedPreferences.create(
+        context,
         PREFERENCES_NAME,
-        Context.MODE_PRIVATE,
+        masterKey,
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
     )
 
     fun load(): AppearanceSettings = AppearanceSettings(
