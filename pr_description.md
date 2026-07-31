@@ -1,12 +1,7 @@
-**What:**
-Replaced the filled `TextField` in the main search screen (`RockMusicRoot.kt`) with an `OutlinedTextField`.
+🔒 [security fix description]
 
-**Why:**
-The application previously used a mix of `OutlinedTextField` (in `RockMusicExperience` and settings) and standard `TextField` (in `RockMusicRoot`). A standard `TextField` with a solid background can look heavy and less refined, especially in modern apps aiming for a clean aesthetic. `OutlinedTextField` provides a neater and more consistent visual style across all screens.
+🎯 **What:** The `AppearancePreferences` class was using standard `SharedPreferences` (with `MODE_PRIVATE`) to store appearance settings such as `theme_mode`, `system_color`, and `blur_frames`. This has been updated to use `EncryptedSharedPreferences`.
 
-**Impact:**
-- **Visuals:** The primary search input now matches the cleaner aesthetic of other search bars in the app.
-- **Consistency:** Search fields now uniformly use `OutlinedTextField` (with trailing clear buttons as per existing patterns).
+⚠️ **Risk:** While the current stored preferences (theme, color, blur) are low-risk hygiene settings, using unencrypted storage mechanisms for preferences sets a weak security posture. Unencrypted shared preferences could expose sensitive information to other apps with elevated privileges (like on rooted devices) or physical access. Adopting `EncryptedSharedPreferences` ensures future configurations added to this store remain secure by default.
 
-**How to Measure:**
-Navigate to the "Search" tab and verify the input field is an outlined text field instead of a filled text field. Verify it functions exactly the same (text input, clear button visibility, layout constraints).
+🛡️ **Solution:** Replaced `Context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)` with `EncryptedSharedPreferences.create(...)`, utilizing `MasterKey` with `AES256_GCM` scheme, and specifying `AES256_SIV` for keys and `AES256_GCM` for values.
