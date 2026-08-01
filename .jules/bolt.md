@@ -4,3 +4,6 @@
 ## 2024-05-19 - Replacing pre-sized ArrayList + for loop with List(size) constructor
 **Learning:** In Kotlin, creating a `List` using the functional constructor `List(size) { index -> ... }` can be slightly faster and is definitely cleaner than manually sizing an `ArrayList` and using a `for` loop to `.add()` items, even when the `ArrayList` is pre-sized.
 **Action:** Default to the `List(size) { ... }` constructor when mapping indexed access (like from an Android framework class or external API that doesn't provide an Iterator) into a Kotlin List.
+## 2025-01-31 - Debouncing and Offloading Compose UI Thread Computations
+**Learning:** Performing expensive filtering operations (e.g. searching through thousands of local tracks) directly in Compose's `remember` block without debouncing can block the main thread and cause UI stuttering, especially on older devices.
+**Action:** Use `LaunchedEffect` with a small `delay(200)` to debounce user input. Additionally, wrap the expensive collection filtering inside `withContext(Dispatchers.Default)` to ensure the computation runs on a background thread instead of blocking the main thread.
