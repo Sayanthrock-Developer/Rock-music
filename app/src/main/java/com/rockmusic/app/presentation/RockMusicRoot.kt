@@ -487,12 +487,14 @@ private fun SearchScreen(tracks: List<LocalTrack>, onPlay: (LocalTrack) -> Unit)
             results = emptyList()
         } else {
             delay(200) // ⚡ Bolt: debounce input to prevent frequent updates
+            val currentQuery = query
+            val currentTracks = tracks
             results = withContext(Dispatchers.Default) {
                 // ⚡ Bolt: filter on background thread to prevent UI stutter
-                tracks.filter {
-                    it.title.contains(query, true) ||
-                        it.artist.contains(query, true) ||
-                        it.album.contains(query, true)
+                currentTracks.filter {
+                    it.title.contains(currentQuery, true) ||
+                        it.artist.contains(currentQuery, true) ||
+                        it.album.contains(currentQuery, true)
                 }
             }
         }
