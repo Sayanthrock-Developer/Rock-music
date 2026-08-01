@@ -350,24 +350,36 @@ private fun ExperienceHome(
                 label = { Text("Search songs or YouTube Music") },
                 leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
                 trailingIcon = {
-                    IconButton(
-                        onClick = {
-                            if (looksLikeLink) onYouTubeLink(query) else onYouTubeSearch(query)
-                        },
-                        enabled = query.isNotBlank() && !youtubeState.isLaunching,
-                    ) {
-                        if (youtubeState.isLaunching) {
-                            CircularProgressIndicator(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .semantics { contentDescription = "Opening YouTube Music" },
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Icon(
-                                Icons.Rounded.PlayArrow,
-                                contentDescription = "Open with YouTube Music",
-                            )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (query.isNotBlank()) {
+                            IconButton(
+                                onClick = {
+                                    query = ""
+                                    onClearYouTubeStatus()
+                                },
+                            ) {
+                                Icon(Icons.Rounded.Close, contentDescription = "Clear search")
+                            }
+                        }
+                        IconButton(
+                            onClick = {
+                                if (looksLikeLink) onYouTubeLink(query) else onYouTubeSearch(query)
+                            },
+                            enabled = query.isNotBlank() && !youtubeState.isLaunching,
+                        ) {
+                            if (youtubeState.isLaunching) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .semantics { contentDescription = "Opening YouTube Music" },
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Rounded.PlayArrow,
+                                    contentDescription = "Open with YouTube Music",
+                                )
+                            }
                         }
                     }
                 },
