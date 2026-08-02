@@ -96,7 +96,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.rockmusic.app.domain.model.LocalTrack
 import com.rockmusic.app.player.PlayerUiState
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 private enum class Destination(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Rounded.Home),
@@ -478,14 +480,21 @@ private fun HomeScreen(
 @Composable
 private fun SearchScreen(tracks: List<LocalTrack>, onPlay: (LocalTrack) -> Unit) {
     var query by remember { mutableStateOf("") }
-    val results = remember(query, tracks) {
+    var results by remember { mutableStateOf<List<LocalTrack>>(emptyList()) }
+
+    // ⚡ Bolt: Debounce keystrokes and offload expensive list filtering to a background thread
+    // to prevent UI stutter and main thread blocking.
+    LaunchedEffect(query, tracks) {
         if (query.isBlank()) {
-            emptyList()
+            results = emptyList()
         } else {
-            tracks.filter {
-                it.title.contains(query, true) ||
-                    it.artist.contains(query, true) ||
-                    it.album.contains(query, true)
+            delay(300)
+            results = withContext(Dispatchers.Default) {
+                tracks.filter {
+                    it.title.contains(query, true) ||
+                        it.artist.contains(query, true) ||
+                        it.album.contains(query, true)
+                }
             }
         }
     }

@@ -4,3 +4,6 @@
 ## 2024-05-19 - Replacing pre-sized ArrayList + for loop with List(size) constructor
 **Learning:** In Kotlin, creating a `List` using the functional constructor `List(size) { index -> ... }` can be slightly faster and is definitely cleaner than manually sizing an `ArrayList` and using a `for` loop to `.add()` items, even when the `ArrayList` is pre-sized.
 **Action:** Default to the `List(size) { ... }` constructor when mapping indexed access (like from an Android framework class or external API that doesn't provide an Iterator) into a Kotlin List.
+## 2024-08-02 - Debouncing and offloading state derivation in Jetpack Compose
+**Learning:** In Jetpack Compose, computing expensive operations (like filtering large lists based on user input) directly within a synchronous `remember` block blocks the main UI thread. When this happens on every keystroke in a `TextField`, it causes significant UI stutter and input lag.
+**Action:** To prevent UI stutter during expensive state derivation, debounce the input using `LaunchedEffect` with `delay` and offload the computation to a background thread using `withContext(Dispatchers.Default)`. This keeps the main thread responsive for typing and animations.
