@@ -187,7 +187,7 @@ private fun SpotifyTrackRow(index: Int, track: SpotifyPlaylistTrackPreview) {
         )
         AsyncImage(
             model = track.imageUrl,
-            contentDescription = null,
+            contentDescription = "Artwork for ${track.name}",
             modifier = Modifier
                 .size(44.dp)
                 .clip(RoundedCornerShape(10.dp)),

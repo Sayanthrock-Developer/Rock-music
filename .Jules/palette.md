@@ -8,3 +8,7 @@
 ## 2024-07-29 - [Search View Aesthetics]
 **Learning:** `OutlinedTextField` provides a cleaner, more consistent look across search inputs compared to the default filled `TextField`, especially in minimal or dark themes where filled fields can feel heavy.
 **Action:** Default to `OutlinedTextField` for primary search fields across the application to maintain a "neat and clean" standard look.
+
+## 2024-08-01 - [Add Alt Text to Artwork Images]
+**Learning:** `AsyncImage` components used for displaying track/album artwork often have `contentDescription = null` by default in lists. Adding dynamic alt text like `contentDescription = "Artwork for ${track.name}"` makes list traversal with screen readers significantly more informative.
+**Action:** When adding images that provide visual context to list items (like album art), always provide a dynamic `contentDescription` based on the item's title rather than `null`.

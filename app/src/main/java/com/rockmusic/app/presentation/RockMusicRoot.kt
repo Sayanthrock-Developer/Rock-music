@@ -821,7 +821,7 @@ private fun TrackRow(track: LocalTrack, onPlay: (LocalTrack) -> Unit) {
         ) {
             AsyncImage(
                 model = track.artworkUri,
-                contentDescription = null,
+                contentDescription = "Artwork for ${track.title}",
                 modifier = Modifier
                     .size(58.dp)
                     .clip(RoundedCornerShape(16.dp))
@@ -915,7 +915,7 @@ private fun MiniPlayer(
         ) {
             AsyncImage(
                 model = player.artworkUri,
-                contentDescription = null,
+                contentDescription = "Artwork for ${player.title.orEmpty()}",
                 modifier = Modifier
                     .size(50.dp)
                     .clip(RoundedCornerShape(14.dp))
