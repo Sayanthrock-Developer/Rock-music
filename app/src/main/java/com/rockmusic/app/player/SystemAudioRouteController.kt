@@ -22,7 +22,9 @@ class SystemAudioRouteController @Inject constructor(
         val mediaRouter = router ?: return emptyList()
         val selected = mediaRouter.getSelectedRoute(MediaRouter.ROUTE_TYPE_LIVE_AUDIO)
         val currentRoutes = buildList {
-            for (routerIndex in 0 until mediaRouter.routeCount) {
+            // Extract routeCount to avoid repeated Binder IPC calls in the loop
+            val routeCount = mediaRouter.routeCount
+            for (routerIndex in 0 until routeCount) {
                 val route = mediaRouter.getRouteAt(routerIndex)
                 if (route.supportedTypes and MediaRouter.ROUTE_TYPE_LIVE_AUDIO != 0) add(route)
             }
@@ -55,7 +57,9 @@ class SystemAudioRouteController @Inject constructor(
         val mediaRouter = router ?: error("Audio output routing is unavailable on this device")
         val route = routesById[index]
             ?: error("The selected audio route is no longer available")
-        val isStillAvailable = (0 until mediaRouter.routeCount)
+        // Extract routeCount to avoid repeated Binder IPC calls in the loop
+        val routeCount = mediaRouter.routeCount
+        val isStillAvailable = (0 until routeCount)
             .any { routerIndex -> mediaRouter.getRouteAt(routerIndex) === route }
         require(isStillAvailable) { "The selected audio route is no longer available" }
         require(route.isEnabled) { "The selected audio route is disabled" }
