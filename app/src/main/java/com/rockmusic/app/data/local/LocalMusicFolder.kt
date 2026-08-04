@@ -12,6 +12,7 @@ data class LocalMusicFolder(
 
 object LocalMusicFolderIdentity {
     private const val ROOT_ID = "__root__"
+    private const val ROOT_DISPLAY_NAME = "Internal storage"
 
     fun id(relativePath: String?): String {
         val normalized = normalizePath(relativePath)
@@ -19,12 +20,12 @@ object LocalMusicFolderIdentity {
     }
 
     fun displayPath(relativePath: String?): String =
-        normalizePath(relativePath).ifBlank { "Internal storage" }
+        normalizePath(relativePath).ifBlank { ROOT_DISPLAY_NAME }
 
     fun displayName(relativePath: String?): String {
         val normalized = normalizePath(relativePath)
         return if (normalized.isBlank()) {
-            "Internal storage"
+            ROOT_DISPLAY_NAME
         } else {
             normalized.substringAfterLast('/')
         }
