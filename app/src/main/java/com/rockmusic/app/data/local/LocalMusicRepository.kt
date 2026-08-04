@@ -172,7 +172,7 @@ class MediaStoreLocalMusicRepository @Inject constructor(
         if (!hasPersistedReadAccess) {
             Log.w(
                 TAG,
-                "Persistent read access was not granted for $uri; the file may need to be selected again after restart.",
+                "Persistent read access was not granted for the file; it may need to be selected again after restart.",
             )
         }
 
@@ -251,7 +251,7 @@ class MediaStoreLocalMusicRepository @Inject constructor(
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: Throwable) {
-                    Log.w(TAG, "Skipping unreadable audio URI: $uri", error)
+                    Log.w(TAG, "Skipping unreadable audio URI", error)
                     null
                 }
             }
