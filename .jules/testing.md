@@ -1,0 +1,3 @@
+## 2023-11-20 - [Testing preferences that use EncryptedSharedPreferences]
+**Learning:** `EncryptedSharedPreferences` requires an Android Keystore which doesn't work correctly in basic Robolectric tests due to missing cryptographic algorithm implementations (java.security.KeyStoreException).
+**Action:** When testing classes like `AppearancePreferences` that rely on `EncryptedSharedPreferences`, create a `Fake` wrapper class that overrides the internal `SharedPreferences` object with a basic, in-memory implementation for testing, rather than trying to configure Robolectric to support the Android KeyStore correctly.
