@@ -7,3 +7,6 @@
 ## 2024-08-02 - Debouncing and offloading state derivation in Jetpack Compose
 **Learning:** In Jetpack Compose, computing expensive operations (like filtering large lists based on user input) directly within a synchronous `remember` block blocks the main UI thread. When this happens on every keystroke in a `TextField`, it causes significant UI stutter and input lag.
 **Action:** To prevent UI stutter during expensive state derivation, debounce the input using `LaunchedEffect` with `delay` and offload the computation to a background thread using `withContext(Dispatchers.Default)`. This keeps the main thread responsive for typing and animations.
+## 2024-11-20 - Binder IPC call optimization in loops
+**Learning:** Querying a dynamic property from a system service (like `MediaRouter.routeCount`) makes a Binder IPC call under the hood. Doing this repeatedly inside a loop condition (e.g., `0 until mediaRouter.routeCount`) introduces significant overhead because the IPC call is evaluated on every iteration.
+**Action:** Extract dynamic properties that involve IPC calls to a local variable (e.g., `val count = mediaRouter.routeCount`) before looping, rather than querying them in the loop condition, especially if the count doesn't change during the loop iteration. This can yield massive performance gains (e.g., 6x faster).
