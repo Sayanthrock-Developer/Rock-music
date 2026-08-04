@@ -107,7 +107,7 @@ class SpotifyPkceTokenClient @Inject constructor(
                 .header("Accept", "application/json")
                 .build()
 
-            client.newCall(httpRequest).execute().use { response ->
+            client.newCall(httpRequest).await().use { response ->
                 val responseBody = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
                     error("Spotify token exchange failed with HTTP ${response.code}.")
