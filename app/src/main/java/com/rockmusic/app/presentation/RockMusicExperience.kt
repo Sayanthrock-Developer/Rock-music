@@ -95,6 +95,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.rockmusic.app.domain.model.LocalTrack
 import com.rockmusic.app.player.PlayerUiState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 private enum class ExperienceDestination(val label: String) {
     HOME("Home"),
@@ -285,9 +288,17 @@ private fun ExperienceHome(
         if (hasPermission && state.tracks.isEmpty() && !state.isLoading) onLoad()
     }
 
-    val visibleTracks = remember(state.tracks, query, source) {
-        UnifiedHomeLibrary.localTracks(state.tracks, query, source)
+    var visibleTracks by remember { mutableStateOf<List<LocalTrack>>(emptyList()) }
+
+    // ⚡ Bolt: Debounce keystrokes and offload expensive list filtering to a background thread
+    // to prevent UI stutter and main thread blocking.
+    LaunchedEffect(state.tracks, query, source) {
+        delay(300)
+        visibleTracks = withContext(Dispatchers.Default) {
+            UnifiedHomeLibrary.localTracks(state.tracks, query, source)
+        }
     }
+
     val featuredTracks = remember(visibleTracks) {
         UnifiedHomeLibrary.featuredTracks(visibleTracks)
     }
@@ -589,8 +600,15 @@ private fun ExperienceLibrary(
     onOpenAudio: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    val results = remember(tracks, query) {
-        UnifiedHomeLibrary.localTracks(tracks, query, UnifiedHomeSource.SONGS)
+    var results by remember { mutableStateOf<List<LocalTrack>>(emptyList()) }
+
+    // ⚡ Bolt: Debounce keystrokes and offload expensive list filtering to a background thread
+    // to prevent UI stutter and main thread blocking.
+    LaunchedEffect(tracks, query) {
+        delay(300)
+        results = withContext(Dispatchers.Default) {
+            UnifiedHomeLibrary.localTracks(tracks, query, UnifiedHomeSource.SONGS)
+        }
     }
 
     LazyColumn(
