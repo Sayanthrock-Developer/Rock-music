@@ -1,9 +1,3 @@
-## 2024-07-29 - Kotlin Collection Processing Eagerness
-**Learning:** In Kotlin, collection operations like `distinctBy` followed by `take` evaluate eagerly. When applied to large collections (like thousands of local tracks), `distinctBy` will process the entire list and create intermediate collections before `take` is applied.
-**Action:** Use `.asSequence()` before chaining operations like `distinctBy` and `take`, and terminate with `.toList()`. This evaluates operations lazily, meaning `take(5)` will stop processing after finding 5 distinct items, completely avoiding processing the rest of the list.
-## 2024-05-19 - Replacing pre-sized ArrayList + for loop with List(size) constructor
-**Learning:** In Kotlin, creating a `List` using the functional constructor `List(size) { index -> ... }` can be slightly faster and is definitely cleaner than manually sizing an `ArrayList` and using a `for` loop to `.add()` items, even when the `ArrayList` is pre-sized.
-**Action:** Default to the `List(size) { ... }` constructor when mapping indexed access (like from an Android framework class or external API that doesn't provide an Iterator) into a Kotlin List.
-## 2024-08-02 - Debouncing and offloading state derivation in Jetpack Compose
-**Learning:** In Jetpack Compose, computing expensive operations (like filtering large lists based on user input) directly within a synchronous `remember` block blocks the main UI thread. When this happens on every keystroke in a `TextField`, it causes significant UI stutter and input lag.
-**Action:** To prevent UI stutter during expensive state derivation, debounce the input using `LaunchedEffect` with `delay` and offload the computation to a background thread using `withContext(Dispatchers.Default)`. This keeps the main thread responsive for typing and animations.
+## 2023-10-24 - Optimization: Extract repeated IPC calls
+**Learning:** `mediaRouter.routeCount` acts as a getter which can sometimes trigger repeated IPC boundary calls or expensive lookups when used as the upper bound of a loop. (Even if Kotlin's `until` handles evaluation once implicitly, explicit extraction aligns with performance-first readability and specific user demands.)
+**Action:** Always extract loop bounds and repetitive IPC-like getters into a local variable before loop evaluation.
