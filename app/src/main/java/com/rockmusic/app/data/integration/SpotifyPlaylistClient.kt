@@ -149,7 +149,7 @@ class SpotifyPlaylistClient @Inject constructor(
         }
     }
 
-    private fun refreshTokenLocked(current: SpotifyStoredToken): SpotifyStoredToken {
+    private suspend fun refreshTokenLocked(current: SpotifyStoredToken): SpotifyStoredToken {
         val refreshToken = current.refreshToken
             ?.takeIf(String::isNotBlank)
             ?: error("Spotify authorisation expired. Re-authorise Spotify to continue.")
@@ -168,7 +168,7 @@ class SpotifyPlaylistClient @Inject constructor(
             .header("Accept", "application/json")
             .build()
 
-        client.newCall(request).execute().use { response ->
+        client.newCall(request).await().use { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 error("Spotify token refresh failed with HTTP ${response.code}. Re-authorise Spotify.")
@@ -189,14 +189,14 @@ class SpotifyPlaylistClient @Inject constructor(
         }
     }
 
-    private fun executePlaylistRequest(playlistId: String, accessToken: String): Response {
+    private suspend fun executePlaylistRequest(playlistId: String, accessToken: String): Response {
         val request = Request.Builder()
             .url("$API_BASE_URL/playlists/$playlistId")
             .get()
             .header("Authorization", "Bearer $accessToken")
             .header("Accept", "application/json")
             .build()
-        return client.newCall(request).execute()
+        return client.newCall(request).await()
     }
 
     private fun Response.toResult(playlistId: String): Result<SpotifyPlaylistPreview> = use { response ->
@@ -365,3 +365,24 @@ private data class SpotifyAlbum(
     val name: String = "",
     val images: List<SpotifyImage> = emptyList(),
 )
+
+private suspend fun okhttp3.Call.await(): okhttp3.Response = kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+    enqueue(object : okhttp3.Callback {
+        override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
+            continuation.resumeWith(Result.success(response))
+        }
+
+        override fun onFailure(call: okhttp3.Call, e: java.io.IOException) {
+            if (continuation.isCancelled) return
+            continuation.resumeWith(Result.failure(e))
+        }
+    })
+
+    continuation.invokeOnCancellation {
+        try {
+            cancel()
+        } catch (t: Throwable) {
+            // Ignore
+        }
+    }
+}
