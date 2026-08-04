@@ -28,4 +28,20 @@ class LocalMusicFolderIdentityTest {
     fun `keeps a top-level folder name`() {
         assertEquals("Music", LocalMusicFolderIdentity.displayName("Music/"))
     }
+
+    @Test
+    fun `normalizes edge cases with complex separators`() {
+        // multiple slashes
+        assertEquals("foo/bar", LocalMusicFolderIdentity.displayPath("foo///bar"))
+        // mixed slashes and backslashes
+        assertEquals("foo/bar", LocalMusicFolderIdentity.displayPath("foo\\//bar"))
+        // multiple backslashes
+        assertEquals("foo/bar", LocalMusicFolderIdentity.displayPath("foo\\\\\\bar"))
+        // leading and trailing mixed separators
+        assertEquals("foo", LocalMusicFolderIdentity.displayPath("\\/foo/\\"))
+        // only separators
+        assertEquals("Internal storage", LocalMusicFolderIdentity.displayPath("///\\\\\\"))
+        // spaces as segments (note: filter(String::isNotBlank) drops these)
+        assertEquals("foo/bar", LocalMusicFolderIdentity.displayPath("foo/ /bar/   /"))
+    }
 }
