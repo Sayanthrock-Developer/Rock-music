@@ -7,3 +7,6 @@
 ## 2024-08-02 - Debouncing and offloading state derivation in Jetpack Compose
 **Learning:** In Jetpack Compose, computing expensive operations (like filtering large lists based on user input) directly within a synchronous `remember` block blocks the main UI thread. When this happens on every keystroke in a `TextField`, it causes significant UI stutter and input lag.
 **Action:** To prevent UI stutter during expensive state derivation, debounce the input using `LaunchedEffect` with `delay` and offload the computation to a background thread using `withContext(Dispatchers.Default)`. This keeps the main thread responsive for typing and animations.
+## 2024-05-19 - Using a single pass for loop to avoid intermediate List allocations
+**Learning:** In Kotlin, using `.asSequence().map {}.filter {}.toList()` creates intermediate sequence objects and lambda allocations. For short chains where the entire result is eventually evaluated anyway (e.g. not terminating early with `.take()`), doing a single pass `for` loop with a pre-sized `ArrayList` is significantly faster and avoids intermediate collection allocations.
+**Action:** Default to the `for` loop and `ArrayList(size)` when mapping over collections where the result is evaluated in its entirety without short-circuiting.

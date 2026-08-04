@@ -264,22 +264,26 @@ class MainViewModel @Inject constructor(
     }
 
     fun playAll(tracks: List<LocalTrack>) {
-        // ⚡ Bolt: use asSequence() for lazy evaluation to avoid intermediate list allocations
-        val decisions = tracks.asSequence()
-            .distinctBy(LocalTrack::mediaUri)
-            .map { track -> track to mediaActionPolicy.decide(track.toPlayRequest()) }
-            .toList()
+        // ⚡ Bolt: Use a single pass over distinct tracks to evaluate decisions and collect
+        // approved tracks, avoiding intermediate list and Pair allocations.
+        val approvedTracks = ArrayList<LocalTrack>(tracks.size)
+        val seenUris = HashSet<String>()
+        var nonExecutionDecision: MediaActionDecision? = null
+        var firstDecision: MediaActionDecision? = null
 
-        _lastActionDecision.value = decisions
-            .firstOrNull { (_, decision) -> decision != MediaActionDecision.ExecuteInApp }
-            ?.second
-            ?: decisions.firstOrNull()?.second
+        for (track in tracks) {
+            if (seenUris.add(track.mediaUri)) {
+                val decision = mediaActionPolicy.decide(track.toPlayRequest())
+                if (firstDecision == null) firstDecision = decision
+                if (decision == MediaActionDecision.ExecuteInApp) {
+                    approvedTracks.add(track)
+                } else if (nonExecutionDecision == null) {
+                    nonExecutionDecision = decision
+                }
+            }
+        }
 
-        // ⚡ Bolt: use asSequence() for lazy evaluation to avoid intermediate list allocations
-        val approvedTracks = decisions.asSequence()
-            .filter { (_, decision) -> decision == MediaActionDecision.ExecuteInApp }
-            .map(Pair<LocalTrack, MediaActionDecision>::first)
-            .toList()
+        _lastActionDecision.value = nonExecutionDecision ?: firstDecision
 
         if (approvedTracks.isNotEmpty()) {
             playerConnection.playQueue(approvedTracks)
