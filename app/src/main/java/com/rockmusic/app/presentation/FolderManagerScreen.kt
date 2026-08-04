@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
+import android.text.format.Formatter
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -317,6 +318,7 @@ private fun FolderRow(
     enabled: Boolean,
     onIncludedChange: (Boolean) -> Unit,
 ) {
+    val context = LocalContext.current
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = if (included) {
@@ -347,7 +349,7 @@ private fun FolderRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    "${folder.songCount} song${if (folder.songCount == 1) "" else "s"} · ${formatBytes(folder.totalBytes)}",
+                    "${folder.songCount} song${if (folder.songCount == 1) "" else "s"} · ${Formatter.formatShortFileSize(context, folder.totalBytes)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -362,14 +364,3 @@ private fun FolderRow(
     }
 }
 
-private fun formatBytes(bytes: Long): String {
-    if (bytes < 1_024L) return "$bytes B"
-    val units = arrayOf("KB", "MB", "GB", "TB")
-    var value = bytes.toDouble()
-    var unitIndex = -1
-    while (value >= 1_024.0 && unitIndex < units.lastIndex) {
-        value /= 1_024.0
-        unitIndex += 1
-    }
-    return String.format(Locale.getDefault(), "%.1f %s", value, units[unitIndex])
-}

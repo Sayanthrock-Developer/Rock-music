@@ -7,3 +7,6 @@
 ## 2024-08-02 - Debouncing and offloading state derivation in Jetpack Compose
 **Learning:** In Jetpack Compose, computing expensive operations (like filtering large lists based on user input) directly within a synchronous `remember` block blocks the main UI thread. When this happens on every keystroke in a `TextField`, it causes significant UI stutter and input lag.
 **Action:** To prevent UI stutter during expensive state derivation, debounce the input using `LaunchedEffect` with `delay` and offload the computation to a background thread using `withContext(Dispatchers.Default)`. This keeps the main thread responsive for typing and animations.
+## 2024-08-04 - Code Health Improvement: Use Android's built-in file size formatter
+**Learning:** For file size formatting in Android, use `android.text.format.Formatter.formatShortFileSize` or `android.text.format.Formatter.formatFileSize` instead of writing a custom byte conversion function. It's safer, more idiomatic, correctly respects the locale, and reduces boilerplate code.
+**Action:** When working with file sizes in a Compose/Android context, default to using the Android framework's built-in `Formatter` utilities instead of custom implementations.
