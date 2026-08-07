@@ -85,6 +85,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -1062,17 +1064,47 @@ private fun GlassFrame(
     content: @Composable () -> Unit,
 ) {
     Surface(
-        modifier = modifier.then(if (useBlurFrames) Modifier.blur(14.dp, BlurredEdgeTreatment.Unbounded) else Modifier),
+        modifier = modifier.then(
+            if (useBlurFrames) {
+                Modifier.blur(14.dp, BlurredEdgeTreatment.Unbounded).drawWithCache {
+                    val sheenGradient = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.15f),
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.05f)
+                        ),
+                        start = Offset(0f, 0f),
+                        end = Offset(size.width, size.height)
+                    )
+                    onDrawWithContent {
+                        drawContent()
+                        drawRect(brush = sheenGradient)
+                    }
+                }
+            } else {
+                Modifier
+            }
+        ),
         shape = shape,
         color = if (useBlurFrames) {
-            MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.2f)
         } else {
             MaterialTheme.colorScheme.surface
         },
         tonalElevation = if (useBlurFrames) 0.dp else 4.dp,
-        shadowElevation = if (useBlurFrames) 0.dp else 2.dp,
+        shadowElevation = if (useBlurFrames) 14.dp else 2.dp,
         border = if (useBlurFrames) {
-            BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f))
+            BorderStroke(
+                1.dp,
+                Brush.linearGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
+                    ),
+                    start = Offset(0f, 0f),
+                    end = Offset.Infinite
+                )
+            )
         } else {
             null
         },
