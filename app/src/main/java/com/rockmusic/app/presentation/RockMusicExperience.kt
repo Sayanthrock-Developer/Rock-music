@@ -72,6 +72,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
@@ -1194,7 +1196,7 @@ private fun ExperienceGlass(
     Surface(
         modifier = modifier.then(
             if (useBlurFrames) {
-                Modifier.drawWithCache {
+                Modifier.blur(14.dp, BlurredEdgeTreatment.Unbounded).drawWithCache {
                     val sheenGradient = Brush.linearGradient(
                         colors = listOf(
                             Color.White.copy(alpha = 0.15f),

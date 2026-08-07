@@ -12,3 +12,6 @@
 ## 2024-08-01 - [Add Alt Text to Artwork Images]
 **Learning:** `AsyncImage` components used for displaying track/album artwork often have `contentDescription = null` by default in lists. Adding dynamic alt text like `contentDescription = "Artwork for ${track.name}"` makes list traversal with screen readers significantly more informative.
 **Action:** When adding images that provide visual context to list items (like album art), always provide a dynamic `contentDescription` based on the item's title rather than `null`.
+## 2026-08-07 - Refactored Blur Implementation
+**Learning:** In Compose, applying `Modifier.blur` with `BlurredEdgeTreatment.Unbounded` to a Surface modifier efficiently creates a glassmorphism blur effect on underlying content, whereas standard surface alpha properties alone do not blur the background.
+**Action:** When asked to improve blur layers/glass aesthetics in Compose UIs, reach for `Modifier.blur` alongside transparency rather than just tweaking colour alpha channels.

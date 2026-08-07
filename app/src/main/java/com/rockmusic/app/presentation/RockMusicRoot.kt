@@ -82,6 +82,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -1060,7 +1062,7 @@ private fun GlassFrame(
     content: @Composable () -> Unit,
 ) {
     Surface(
-        modifier = modifier,
+        modifier = modifier.then(if (useBlurFrames) Modifier.blur(14.dp, BlurredEdgeTreatment.Unbounded) else Modifier),
         shape = shape,
         color = if (useBlurFrames) {
             MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)
