@@ -1,0 +1,3 @@
+## 2024-08-07 - Applied Blur Fixed Glassmorphism UI Style
+**Learning:** Glassmorphism in Compose (`Modifier.blur(14.dp, BlurredEdgeTreatment.Unbounded)`) frequently causes rendering glitches on some devices and emulator APIs if not bound strictly. You need to provide exact clipping and handle bounding boxes. However, using it for navigation rails/bars usually relies on unbounding or clipping depending on parent shapes.
+**Action:** When implementing or updating blur effects, apply `BlurredEdgeTreatment.Unbounded`, handle shadow sizes specifically alongside `tonalElevation=0.dp`, and check the preview and navigation layouts.
