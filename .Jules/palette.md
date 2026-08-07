@@ -12,3 +12,7 @@
 ## 2024-08-01 - [Add Alt Text to Artwork Images]
 **Learning:** `AsyncImage` components used for displaying track/album artwork often have `contentDescription = null` by default in lists. Adding dynamic alt text like `contentDescription = "Artwork for ${track.name}"` makes list traversal with screen readers significantly more informative.
 **Action:** When adding images that provide visual context to list items (like album art), always provide a dynamic `contentDescription` based on the item's title rather than `null`.
+
+## 2024-08-07 - [Added Keyboard IME Actions to TextFields]
+**Learning:** By default, single-line text fields on Android show a generic "Done" or "Enter" action on the soft keyboard. Setting `keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)` for search inputs provides a clearer visual cue (a search icon) and better aligns with user expectations for search interactions.
+**Action:** Always provide appropriate `keyboardOptions` (like `ImeAction.Search`, `ImeAction.Done`, `ImeAction.Go`) for `TextField` and `OutlinedTextField` components based on their context to improve the mobile keyboard experience.
